@@ -14,7 +14,8 @@ import json
 import os
 import asyncio
 import concurrent.futures
-from anthropic import Anthropic
+from google import genai
+from google.genai import types
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import traceback
@@ -26,12 +27,11 @@ try:
 except ImportError:
     st.error("找不到 db_logic.py 或 order_utils.py，請確認檔案是否存在。")
 
-# --- 1. 配置 Anthropic ---
-# 請在 .streamlit/secrets.toml 中設定 CLAUDE_KEY = "your_api_key"
-if "CLAUDE_KEY" in st.secrets:
-    client = Anthropic(api_key=st.secrets["CLAUDE_KEY"])
+# --- 1. 配置 Gemini ---
+if "GEMINI_KEY" in st.secrets:
+    client = genai.Client(api_key=st.secrets["GEMINI_KEY"])
 else:
-    st.warning("請在 secrets 中配置 CLAUDE_KEY 以啟動 AI 助手。")
+    st.warning("請在 secrets 中配置 GEMINI_KEY 以啟動 AI 助手。")
 
 # --- 2. MCP 伺服器配置 ---
 def get_mcp_params_from_claude_config(server_name="drink-server"):
@@ -75,47 +75,48 @@ if mcp_server_params is None:
         env={**os.environ, "PYTHONPATH": BASE_DIR} # 強制加入當前路徑到搜尋路徑
     )
 
-# --- 3. AI 邏輯核心 (Anthropic + MCP Tool Use) ---
+# --- 3. AI 邏輯核心 (Gemini + MCP Tool Use) ---
 async def process_with_ai(user_input):
-    """使用 Claude SDK 處理對話與 MCP 工具調用"""
+    """使用 Gemini SDK 處理對話與 MCP 工具調用"""
     try:
         async with stdio_client(mcp_server_params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 
-                # 獲取 MCP 伺服器提供的所有工具
+                # 獲取 MCP 伺服器提供的所有工具並轉換為 Gemini 可識別的 Function Declarations
                 tools_response = await session.list_tools()
-                claude_tools = []
+                gemini_tools = []
                 for tool in tools_response.tools:
-                    claude_tools.append({
-                        "name": tool.name,
-                        "description": tool.description,
-                        "input_schema": tool.inputSchema
-                    })
+                    gemini_tools.append(types.FunctionDeclaration(
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.inputSchema
+                    ))
 
-                # 向 Claude 發送請求
-                messages = [{"role": "user", "content": user_input}]
-                response = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=1024,
-                    tools=claude_tools,
-                    messages=messages,
-                    system="你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。"
+                # 向 Gemini 發送請求 (使用 gemini-2.5-flash)
+                config = types.GenerateContentConfig(
+                    system_instruction="你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。",
+                    tools=[types.Tool(function_declarations=gemini_tools)] if gemini_tools else None,
+                    temperature=0.7
+                )
+                
+                # 發送對話
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=user_input,
+                    config=config
                 )
 
-                # 處理 Tool Call 請求
-                if response.stop_reason == "tool_use":
+                # 處理 Gemini 返回的 Tool Call
+                if response.function_calls:
                     final_content = []
-                    for content in response.content:
-                        if content.type == "text":
-                            final_content.append(content.text)
-                        elif content.type == "tool_use":
-                            # 執行 MCP 工具
-                            tool_result = await session.call_tool(content.name, content.input)
-                            final_content.append(tool_result.content[0].text)
+                    # 執行所有 Tool Call
+                    for call in response.function_calls:
+                        mcp_result = await session.call_tool(call.name, call.args)
+                        final_content.append(mcp_result.content[0].text)
                     return "\n".join(final_content)
                 else:
-                    return response.content[0].text
+                    return response.text
                     
     except Exception as e:
             # 關鍵：這會印出整個 ExceptionGroup 的詳細內容
