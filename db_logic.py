@@ -15,30 +15,40 @@ def get_firestore_client():
     """
     獲取並初始化 Firestore 客戶端。
     採用單例模式避免重複初始化與 NoneType 錯誤。
+    支援本地讀取金鑰檔，或在雲端讀取 Streamlit Secrets 的 gcp_service_account 設定。
     """
     global _db_client
     if _db_client is None:
         try:
-            # 專案 ID 根據您的 Firebase 控制台資訊
-            #_db_client = firestore.Client(project="myfinanceapp-f08ae")
-            # 指定您的金鑰路徑
-            #key_path = r"C:\mcp-drink-main\firebase-adminsdk.json"
-            # 自動取得目前檔案所在的目錄路徑
+            # 優先從 Streamlit Secrets 讀取 (適合部署到 Streamlit Community Cloud)
+            import streamlit as st
+            if "gcp_service_account" in st.secrets:
+                logger.info("Attempting to load credentials from Streamlit Secrets.")
+                from google.oauth2 import service_account
+                creds_info = dict(st.secrets["gcp_service_account"])
+                # 確保 private_key 中換行符號正確
+                if "private_key" in creds_info:
+                    creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+                creds = service_account.Credentials.from_service_account_info(creds_info)
+                _db_client = firestore.Client(credentials=creds, project=creds_info.get("project_id"))
+                logger.info("Firestore client initialized successfully via Streamlit Secrets.")
+                return _db_client
+        except Exception as e:
+            logger.warning(f"Failed to load credentials from Streamlit Secrets: {e}. Trying local file...")
+
+        try:
+            # 備用方案：從本地金鑰檔載入 (適合本地開發)
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            # 組合金鑰檔名 (請確保檔名與資料夾內的一致)
             key_filename = "firebase-adminsdk.json"
             key_path = os.path.join(current_dir, key_filename)
-            # 重要：先檢查檔案是否存在
+            
             if not os.path.exists(key_path):
-                logger.error(f"FATAL: Key file NOT FOUND at {key_path}")
+                logger.error(f"FATAL: Key file NOT FOUND at {key_path} and no Secrets found.")
                 return None
 
-            # 顯式載入金鑰檔案
             logger.info(f"Attempting to load key from: {key_path}")
-
             _db_client = firestore.Client.from_service_account_json(key_path)            
-            logger.info("Firestore client initialized successfully.")
+            logger.info("Firestore client initialized successfully via local JSON key.")
         except Exception as e:
             logger.error(f"Failed to initialize Firestore Client: {e}")
             return None

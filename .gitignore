@@ -13,5 +13,5 @@ wheels/
 *secrets*.toml
 *.json
 *API Key*.txt
-*.txt
+*文件*.txt
 *.lock
