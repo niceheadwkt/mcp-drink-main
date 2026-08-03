@@ -121,7 +121,7 @@ async def process_with_ai(user_input):
             # 關鍵：這會印出整個 ExceptionGroup 的詳細內容
             full_error = traceback.format_exc()
             print(f"DEBUG 詳細錯誤內容:\n{full_error}") # 印在終端機
-            return f"❌ 系統錯誤: {str(e)}\n\n詳細資訊已記錄在終端機。"
+            return f"❌ 系統錯誤: {str(e)}\n\n詳細資訊:\n```\n{full_error}\n```"
             
 def drink_ai_agent(user_message: str) -> str:
     """Streamlit 介面呼叫入口 (相容 Streamlit Community Cloud 與 Python 3.13 的事件迴圈)"""
