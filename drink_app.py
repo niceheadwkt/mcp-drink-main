@@ -78,6 +78,7 @@ if mcp_server_params is None:
 # --- 3. AI 邏輯核心 (Gemini + MCP Tool Use) ---
 async def process_with_ai(user_input):
     """使用 Gemini SDK 處理對話與 MCP 工具調用"""
+    global client
     try:
         async with stdio_client(mcp_server_params) as (read, write):
             async with ClientSession(read, write) as session:
