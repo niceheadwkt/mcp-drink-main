@@ -124,11 +124,18 @@ async def process_with_ai(user_input):
             return f"❌ 系統錯誤: {str(e)}\n\n詳細資訊已記錄在終端機。"
             
 def drink_ai_agent(user_message: str) -> str:
-    """Streamlit 介面呼叫入口"""
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        #future = pool.submit(asyncio.run, process_with_ai(user_message))
-        future = pool.submit(lambda: asyncio.run(process_with_ai(user_message)))
-        return future.result()
+    """Streamlit 介面呼叫入口 (相容 Streamlit Community Cloud 與 Python 3.13 的事件迴圈)"""
+    try:
+        import anyio
+        return anyio.run(process_with_ai, user_message)
+    except Exception as e:
+        # 降級方案：使用普通 asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(process_with_ai(user_message))
+        except Exception as ex:
+            return f"❌ AI 執行錯誤: {str(ex)}"
                 
 sugar_options = ["正常甜", "五分甜", "三分甜", "一分糖", "無糖"]
 ice_options = ["正常冰", "少冰", "微冰", "去冰", "完全去冰", "熱飲"]
