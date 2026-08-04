@@ -1185,14 +1185,13 @@ function editDistance(s1, s2) {
 // 清理 Gemini Schema (防 400 錯誤)
 function cleanSchemaForGemini(d) {
     if (typeof d !== 'object' || d === null) return d;
+    if (Array.isArray(d)) {
+        return d.map(item => cleanSchemaForGemini(item));
+    }
     const cleaned = {};
     for (const k in d) {
         if (k === 'additionalProperties' || k === 'additional_properties') continue;
-        if (typeof d[k] === 'object') {
-            cleaned[k] = cleanSchemaForGemini(d[k]);
-        } else {
-            cleaned[k] = d[k];
-        }
+        cleaned[k] = cleanSchemaForGemini(d[k]);
     }
     return cleaned;
 }
