@@ -269,23 +269,27 @@ async def process_with_ai(user_input):
                 else:
                     return f"❌ 錯誤：未知的 AI 服務提供者: {ai_provider}"
 
-    except Exception as e:
+    except BaseException as e:
             full_error = traceback.format_exc()
+            err_str = str(e)
             print(f"DEBUG 詳細錯誤內容:\n{full_error}")
-            return f"❌ 系統錯誤: {str(e)}\n\n詳細資訊:\n```\n{full_error}\n```"
+            # 針對額度不足錯誤提供友善的提示
+            if "credit balance is too low" in err_str or "balance" in err_str.lower():
+                return "❌ AI 服務商額度不足，請前往該平台後台儲值，或在左側邊欄切換成其他 AI (如 Gemini) 或本地 Ollama 模式。"
+            return f"❌ 系統錯誤: {err_str}\n\n詳細資訊:\n```\n{full_error}\n```"
             
 def drink_ai_agent(user_message: str) -> str:
     """Streamlit 介面呼叫入口 (相容 Streamlit Community Cloud 與 Python 3.13 的事件迴圈)"""
     try:
         import anyio
         return anyio.run(process_with_ai, user_message)
-    except Exception as e:
+    except BaseException as e:
         # 降級方案：使用普通 asyncio
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             return loop.run_until_complete(process_with_ai(user_message))
-        except Exception as ex:
+        except BaseException as ex:
             return f"❌ AI 執行錯誤: {str(ex)}"
                 
 sugar_options = ["正常甜", "五分甜", "三分甜", "一分糖", "無糖"]
