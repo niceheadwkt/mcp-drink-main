@@ -824,11 +824,32 @@ async function callGeminiDirectly(prompt, apiKey) {
         generationConfig: { temperature: 0.7 }
     };
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-    });
+    let res;
+    let retries = 3;
+    let delay = 1000;
+    for (let i = 0; i < retries; i++) {
+        res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) break;
+        
+        // 解析錯誤訊息決定是否重試
+        const errData = await res.clone().json().catch(() => ({}));
+        const errMsg = errData.error?.message || "";
+        
+        if (res.status === 503 || res.status === 429 || errMsg.includes("high demand") || errMsg.includes("quota")) {
+            if (i < retries - 1) {
+                console.warn(`Gemini API 忙碌或超出限制，${delay}ms 後進行第 ${i+1} 次重試...`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2; // 兩倍延遲
+                continue;
+            }
+        }
+        break;
+    }
 
     if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
