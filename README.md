@@ -13,7 +13,11 @@
 * **功能**：
   - 提供直覺的點餐表單（選擇人名、飲品、甜度冰量、加料）。
   - 即時從雲端 Firestore 載入訂單列表，並支援在網頁上直接「修改」或「刪除」訂單。
-  - 整合一個 **AI 助手對話框**：背後連接 Anthropic Claude 3.5 Sonnet 模型，並透過 `stdio` 連線動態載入 [mcp_server.py](file:///c:/aiTest/mcp-drink-main/mcp_server.py) 的 MCP 工具。使用者可以直接在對話框中輸入：「*幫林進源訂一杯粉粿桂花檸檬 無糖去冰 加招牌粉粿*」，AI 就會自動調用 MCP 工具完成資料庫寫入並在 UI 上更新。
+  - **多 AI 廠商與雙模式切換側邊欄**：
+    - 支援雲端模型（如 Gemini, OpenAI, Claude）與本地 Ollama 模型（如 Gemma 4, Qwen 等）雙模式。
+    - **雲端模式**下會自動顯示目前採用的 API 與模型版本。
+    - **本地模式**下會自動偵測本地已下載的 Ollama 模型清單並提供下拉選單切換，並優先建議 `gemma4`。
+    - 無論雲端或本地，皆可透過 OpenAI 相容協定或 Native SDK 發送對話並在背景安全解析 MCP 工具。
 
 ### 2. 🤖 FastMCP 伺服器 - [mcp_server.py](file:///c:/aiTest/mcp-drink-main/mcp_server.py)
 * **角色**：基於 Model Context Protocol (MCP) 標準的後端服務。
@@ -64,11 +68,16 @@ uv pip install -r pyproject.toml
 * 將其重新命名為 `firebase-adminsdk.json` 並放置於專案根目錄下（即 `c:/aiTest/mcp-drink-main/firebase-adminsdk.json`）。
 * 本專案的 [db_logic.py](file:///c:/aiTest/mcp-drink-main/db_logic.py) 將會自動偵測並載入該金鑰。
 
-### 3. Anthropic API 金鑰配置 (用於 Streamlit UI 內置 AI 助手)
+### 3. API 金鑰配置 (用於 Streamlit UI 內置 AI 助手)
 * 請在專案根目錄下建立 `.streamlit` 資料夾，並於其中建立 [secrets.toml](file:///c:/aiTest/mcp-drink-main/.streamlit/secrets.toml) 檔案：
   ```toml
-  CLAUDE_KEY = "您的_ANTHROPIC_API_KEY"
+  # 支援配置多個 AI 廠商金鑰，系統會自動依照您在 secrets.toml 中撰寫的 Key 順序來決定預設使用的雲端 AI！
+  GEMINI_KEY = "您的_GEMINI_API_KEY"     # 啟用 Gemini
+  OPENAI_KEY = "您的_OPENAI_API_KEY"     # 啟用 OpenAI (ChatGPT)
+  CLAUDE_KEY = "您的_ANTHROPIC_API_KEY"   # 啟用 Anthropic (Claude)
   ```
+* **環境變數支援**：亦支援自動讀取系統環境變數（如 `GOOGLE_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`），本地 NB 執行時免填設定檔。
+* **本地 Ollama 免金鑰**：若選擇本地 Ollama 模式，則無需配置任何 API 金鑰，只需在本地執行 Ollama (`ollama serve`) 即可。
 
 ---
 

@@ -27,11 +27,59 @@ try:
 except ImportError:
     st.error("找不到 db_logic.py 或 order_utils.py，請確認檔案是否存在。")
 
-# --- 1. 配置 Gemini ---
-if "GEMINI_KEY" in st.secrets:
-    client = genai.Client(api_key=st.secrets["GEMINI_KEY"])
-else:
-    st.warning("請在 secrets 中配置 GEMINI_KEY 以啟動 AI 助手。")
+def get_local_ollama_models():
+    """發送請求取得本地 Ollama 的模型清單"""
+    import requests
+    try:
+        response = requests.get("http://localhost:11434/api/tags", timeout=1.0)
+        if response.status_code == 200:
+            data = response.json()
+            # 取得模型名稱，排除可能為空的名稱
+            models = [m.get("name") for m in data.get("models", []) if m.get("name")]
+            return models
+    except Exception:
+        pass
+    return []
+
+# --- 1. 宣告與掃描可用之 AI 客戶端金鑰 ---
+client = None
+ai_provider = None
+ai_model = None
+
+# 取得本地已下載的 Ollama 模型清單
+local_models = get_local_ollama_models()
+
+# 定義金鑰與產商/模型對照
+PROVIDER_MAP = {
+    "GEMINI_KEY": ("Gemini", "gemini-2.5-flash"),
+    "OPENAI_KEY": ("OpenAI", "gpt-4o-mini"),
+    "CLAUDE_KEY": ("Anthropic", "claude-3-5-sonnet-latest")
+}
+
+# 掃描可用雲端金鑰 (依 st.secrets 的 Key 順序優先)
+available_cloud_providers = {}
+try:
+    for key in st.secrets.keys():
+        if key in PROVIDER_MAP:
+            provider_name, model_name = PROVIDER_MAP[key]
+            key_val = st.secrets[key]
+            if key_val:
+                available_cloud_providers[provider_name] = (key_val, model_name)
+except Exception:
+    pass
+
+# 掃描本地環境變數作為備用
+env_keys = [
+    ("GOOGLE_API_KEY", "Gemini", "gemini-2.5-flash"),
+    ("GEMINI_API_KEY", "Gemini", "gemini-2.5-flash"),
+    ("OPENAI_API_KEY", "OpenAI", "gpt-4o-mini"),
+    ("ANTHROPIC_API_KEY", "Anthropic", "claude-3-5-sonnet-latest")
+]
+for env_var, provider_name, model_name in env_keys:
+    if provider_name not in available_cloud_providers:
+        key_val = os.environ.get(env_var)
+        if key_val:
+            available_cloud_providers[provider_name] = (key_val, model_name)
 
 # --- 2. MCP 伺服器配置 ---
 def get_mcp_params_from_claude_config(server_name="drink-server"):
@@ -75,54 +123,155 @@ if mcp_server_params is None:
         env={**os.environ, "PYTHONPATH": BASE_DIR} # 強制加入當前路徑到搜尋路徑
     )
 
+def clean_schema(d):
+    """遞迴清理 Schema，移除 Gemini 不支援的欄位 (如 additionalProperties, anyOf)"""
+    if not isinstance(d, dict):
+        return d
+        
+    # 若包含 anyOf，將其簡化為第一個非 null 的單一型態以相容 Gemini
+    if "anyOf" in d:
+        non_null_type = None
+        for option in d["anyOf"]:
+            if isinstance(option, dict) and option.get("type") != "null":
+                non_null_type = option.get("type")
+                break
+        if non_null_type:
+            cleaned = {k: v for k, v in d.items() if k != "anyOf"}
+            cleaned["type"] = non_null_type
+            return clean_schema(cleaned)
+            
+    cleaned = {}
+    for k, v in d.items():
+        if k in ("additionalProperties", "additional_properties"):
+            continue
+        if isinstance(v, dict):
+            cleaned[k] = clean_schema(v)
+        elif isinstance(v, list):
+            cleaned[k] = [clean_schema(item) if isinstance(item, dict) else item for item in v]
+        else:
+            cleaned[k] = v
+    return cleaned
+
 # --- 3. AI 邏輯核心 (Gemini + MCP Tool Use) ---
 async def process_with_ai(user_input):
-    """使用 Gemini SDK 處理對話與 MCP 工具調用"""
-    global client
+    """根據偵測到的 AI 服務提供者處理對話與 MCP 工具調用"""
+    global client, ai_provider, ai_model
+    if not client:
+        return "❌ 錯誤：未初始化 AI 客戶端。請檢查 API 金鑰配置。"
+
     try:
         async with stdio_client(mcp_server_params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 
-                # 獲取 MCP 伺服器提供的所有工具並轉換為 Gemini 可識別的 Function Declarations
+                # 獲取 MCP 伺服器提供的所有工具
                 tools_response = await session.list_tools()
-                gemini_tools = []
-                for tool in tools_response.tools:
-                    gemini_tools.append(types.FunctionDeclaration(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.inputSchema
-                    ))
-
-                # 向 Gemini 發送請求 (使用 gemini-2.5-flash)
-                config = types.GenerateContentConfig(
-                    system_instruction="你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。",
-                    tools=[types.Tool(function_declarations=gemini_tools)] if gemini_tools else None,
-                    temperature=0.7
-                )
                 
-                # 發送對話
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=user_input,
-                    config=config
-                )
+                # 根據不同廠商格式化工具列表
+                formatted_tools = []
+                gemini_tools = None
+                
+                if ai_provider == "Gemini":
+                    for tool in tools_response.tools:
+                        # 清理 schema，防止 Gemini 丟出 400 錯誤
+                        cleaned_schema = clean_schema(tool.inputSchema)
+                        formatted_tools.append(types.FunctionDeclaration(
+                            name=tool.name,
+                            description=tool.description,
+                            parameters=cleaned_schema
+                        ))
+                    gemini_tools = [types.Tool(function_declarations=formatted_tools)] if formatted_tools else None
+                elif ai_provider == "OpenAI":
+                    for tool in tools_response.tools:
+                        formatted_tools.append({
+                            "type": "function",
+                            "function": {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.inputSchema
+                            }
+                        })
+                elif ai_provider == "Anthropic":
+                    for tool in tools_response.tools:
+                        formatted_tools.append({
+                            "name": tool.name,
+                            "description": tool.description,
+                            "input_schema": tool.inputSchema
+                        })
 
-                # 處理 Gemini 返回的 Tool Call
-                if response.function_calls:
-                    final_content = []
-                    # 執行所有 Tool Call
-                    for call in response.function_calls:
-                        mcp_result = await session.call_tool(call.name, call.args)
-                        final_content.append(mcp_result.content[0].text)
-                    return "\n".join(final_content)
+                # A. Gemini 請求與 Tool Call 處理
+                if ai_provider == "Gemini":
+                    config = types.GenerateContentConfig(
+                        system_instruction="你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。",
+                        tools=gemini_tools,
+                        temperature=0.7
+                    )
+                    response = client.models.generate_content(
+                        model=ai_model,
+                        contents=user_input,
+                        config=config
+                    )
+                    if response.function_calls:
+                        final_content = []
+                        for call in response.function_calls:
+                            mcp_result = await session.call_tool(call.name, call.args)
+                            final_content.append(mcp_result.content[0].text)
+                        return "\n".join(final_content)
+                    else:
+                        return response.text or ""
+
+                # B. OpenAI 請求與 Tool Call 處理
+                elif ai_provider == "OpenAI":
+                    messages = [
+                        {"role": "system", "content": "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。"},
+                        {"role": "user", "content": user_input}
+                    ]
+                    response = client.chat.completions.create(
+                        model=ai_model,
+                        messages=messages,
+                        tools=formatted_tools if formatted_tools else None,
+                        temperature=0.7
+                    )
+                    message = response.choices[0].message
+                    if message.tool_calls:
+                        final_content = []
+                        for tool_call in message.tool_calls:
+                            func_args = json.loads(tool_call.function.arguments)
+                            mcp_result = await session.call_tool(tool_call.function.name, func_args)
+                            final_content.append(mcp_result.content[0].text)
+                        return "\n".join(final_content)
+                    else:
+                        return message.content
+
+                # C. Anthropic 請求與 Tool Call 處理
+                elif ai_provider == "Anthropic":
+                    response = client.messages.create(
+                        model=ai_model,
+                        max_tokens=1024,
+                        system="你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。",
+                        messages=[
+                            {"role": "user", "content": user_input}
+                        ],
+                        tools=formatted_tools if formatted_tools else None,
+                        temperature=0.7
+                    )
+                    tool_calls = [content for content in response.content if content.type == "tool_use"]
+                    if tool_calls:
+                        final_content = []
+                        for call in tool_calls:
+                            mcp_result = await session.call_tool(call.name, call.input)
+                            final_content.append(mcp_result.content[0].text)
+                        return "\n".join(final_content)
+                    else:
+                        text_blocks = [content for content in response.content if content.type == "text"]
+                        return "\n".join([b.text for b in text_blocks])
+
                 else:
-                    return response.text
-                    
+                    return f"❌ 錯誤：未知的 AI 服務提供者: {ai_provider}"
+
     except Exception as e:
-            # 關鍵：這會印出整個 ExceptionGroup 的詳細內容
             full_error = traceback.format_exc()
-            print(f"DEBUG 詳細錯誤內容:\n{full_error}") # 印在終端機
+            print(f"DEBUG 詳細錯誤內容:\n{full_error}")
             return f"❌ 系統錯誤: {str(e)}\n\n詳細資訊:\n```\n{full_error}\n```"
             
 def drink_ai_agent(user_message: str) -> str:
@@ -365,6 +514,64 @@ if st.button("🔄 重新整理"):
 with st.sidebar:
     st.title("🤖 飲品小助手")
     
+    # ⚙️ 助手模式配置區
+    st.subheader("⚙️ 助手模式配置")
+    modes = []
+    if available_cloud_providers:
+        modes.append("☁️ 雲端 AI 模式")
+    if local_models:
+        modes.append("🏠 本地 Ollama 模式")
+        
+    if not modes:
+        st.warning("⚠️ 未偵測到任何可用模型 (無雲端金鑰且本地 Ollama 未啟動)")
+        selected_mode = None
+    else:
+        # 使用者選擇模式
+        selected_mode = st.radio("選擇 AI 運行模式", modes, index=0)
+        
+    if selected_mode == "☁️ 雲端 AI 模式":
+        # 取得預設的雲端服務商
+        cloud_p = list(available_cloud_providers.keys())[0]
+        key_val, model_name = available_cloud_providers[cloud_p]
+        
+        ai_provider = cloud_p
+        ai_model = model_name
+        
+        if cloud_p == "Gemini":
+            client = genai.Client(api_key=key_val)
+        elif cloud_p == "OpenAI":
+            from openai import OpenAI
+            client = OpenAI(api_key=key_val)
+        elif cloud_p == "Anthropic":
+            from anthropic import Anthropic
+            client = Anthropic(api_key=key_val)
+            
+        st.success(f"目前使用雲端模型：`{ai_provider} ({ai_model})`")
+        
+    elif selected_mode == "🏠 本地 Ollama 模式":
+        default_local_idx = 0
+        # 優先尋找含有 gemma4 的本地模型
+        for idx, m in enumerate(local_models):
+            if "gemma4" in m.lower():
+                default_local_idx = idx
+                break
+                
+        selected_local_model = st.selectbox(
+            "選擇本地模型", 
+            local_models, 
+            index=default_local_idx
+        )
+        
+        ai_provider = "OpenAI"  # Ollama 可相容於 OpenAI 接口格式
+        ai_model = selected_local_model
+        
+        from openai import OpenAI
+        # 初始化指向本地 Ollama 的客戶端
+        client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+        st.success(f"目前使用本地模型：`{ai_model}`")
+
+    st.divider()
+    
     # 確保訊息容器先存在
     chat_placeholder = st.container()
     
@@ -384,7 +591,7 @@ with st.sidebar:
         response = drink_ai_agent(user_input)
         st.session_state.messages.append({"role": "Drink-Assistant", "content": response})
         
-        if "✅" in response:
+        if response and "✅" in response:
             time.sleep(0.5) 
             st.rerun()
         else:
@@ -400,16 +607,3 @@ with st.sidebar:
     - "顯示全部重複訂單"
     - "有什麼訂單重複了嗎"
     """)
-
-# 加入在側邊欄最底部
-    st.divider()
-    st.subheader("🛠️ 本地模型狀態")
-    if st.button("🔍 檢查 Ollama 可用模型"):
-        try:
-            # 這裡會列出 Ollama 已經下載的所有模型
-            models = client.models.list()
-            st.write("目前本地可選用的模型 ID：")
-            for m in models.data:
-                st.code(m.id)
-        except Exception as e:
-            st.error(f"無法連線至 Ollama: {e}")
