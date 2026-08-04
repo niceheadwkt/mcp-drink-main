@@ -1196,8 +1196,13 @@ function executeGetDuplicateStats() {
 }
 
 // 7. 修改點餐紀錄工具
+// 7. 修改點餐紀錄工具
 async function executeUpdateOrderByName(name, drinkName, spec, topping) {
-    const userOrders = ordersList.filter(o => o.name === name);
+    // 獲取目前資料庫中所有的訂購人姓名列表
+    const allNames = Array.from(new Set(ordersList.map(o => o.name).filter(Boolean)));
+    const matchedName = fuzzyMatchName(name, allNames) || name; // 模糊匹配姓名，找不到則用原名
+
+    const userOrders = ordersList.filter(o => o.name === matchedName);
     if (userOrders.length === 0) {
         return `❌ 找不到訂購人為 ${name} 的點餐紀錄，無法修改。`;
     }
@@ -1238,19 +1243,47 @@ async function executeUpdateOrderByName(name, drinkName, spec, topping) {
     };
     
     await collectionRef.doc(targetOrder.id).update(payload);
-    return `✅ 成功為 ${name} 修改訂單！\n🥤 新飲品：${updatedDrink}\n🌡️ 新規格：${updatedSpec}\n💎 新加料：${updatedTopping}\n💰 新金額：$${total} 元\n✨ 資料已即時更新至雲端。`;
+    return `✅ 成功為 ${matchedName} 修改訂單！\n🥤 新飲品：${updatedDrink}\n🌡️ 新規格：${updatedSpec}\n💎 新加料：${updatedTopping}\n💰 新金額：$${total} 元\n✨ 資料已即時更新至雲端。`;
 }
 
 // 8. 刪除點餐紀錄工具
 async function executeDeleteOrderByName(name) {
-    const userOrders = ordersList.filter(o => o.name === name);
+    const allNames = Array.from(new Set(ordersList.map(o => o.name).filter(Boolean)));
+    const matchedName = fuzzyMatchName(name, allNames) || name;
+
+    const userOrders = ordersList.filter(o => o.name === matchedName);
     if (userOrders.length === 0) {
         return `❌ 找不到訂購人為 ${name} 的點餐紀錄，無法刪除。`;
     }
     const targetOrder = userOrders[0];
     
     await collectionRef.doc(targetOrder.id).delete();
-    return `✅ 已成功為 ${name} 刪除最新的點餐紀錄 (原品項: ${targetOrder.item})！\n✨ 雲端資料庫已即時同步。`;
+    return `✅ 已成功為 ${matchedName} 刪除最新的點餐紀錄 (原品項: ${targetOrder.item})！\n✨ 雲端資料庫已即時同步。`;
+}
+
+// 專屬姓名的模糊匹配，防同音字/錯別字 (如 國炯 -> 國烔)
+function fuzzyMatchName(input, choices) {
+    if (!input) return null;
+    input = input.trim().toLowerCase();
+    
+    // 1. 完全一致
+    if (choices.includes(input)) return input;
+    const exactChoice = choices.find(c => c.toLowerCase() === input);
+    if (exactChoice) return exactChoice;
+
+    // 2. 相似度計算
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    choices.forEach(choice => {
+        const score = getSimilarity(input, choice.toLowerCase());
+        if (score > bestScore && score > 0.5) { // 相似度高於 50% 始匹配
+            bestScore = score;
+            bestMatch = choice;
+        }
+    });
+
+    return bestMatch; // 若皆不吻合，回傳 null 進行精確配對降級
 }
 
 // --- 11. 輔助工具函式 ---
