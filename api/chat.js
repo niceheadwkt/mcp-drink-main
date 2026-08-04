@@ -58,6 +58,31 @@ export default async function handler(req, res) {
                     name: "get_duplicate_statistics",
                     description: "取得重複訂單的比例與統計建議。",
                     parameters: { type: "OBJECT", properties: {} }
+                },
+                {
+                    name: "update_order_by_name",
+                    description: "依訂購人姓名修改其最新的點餐資訊。參數: name, drink_name, spec, topping",
+                    parameters: {
+                        type: "OBJECT",
+                        properties: {
+                            name: { type: "STRING", description: "訂購人姓名" },
+                            drink_name: { type: "STRING", description: "新的飲料名稱 (選填)" },
+                            spec: { type: "STRING", description: "新的規格，如: 無糖/去冰 (選填)" },
+                            topping: { type: "STRING", description: "新的加料內容，若要取消加料請傳入『無』 (選填)" }
+                        },
+                        required: ["name"]
+                    }
+                },
+                {
+                    name: "delete_order_by_name",
+                    description: "依訂購人姓名刪除其最新的點餐紀錄。參數: name",
+                    parameters: {
+                        type: "OBJECT",
+                        properties: {
+                            name: { type: "STRING", description: "要刪除點餐紀錄的訂購人姓名" }
+                        },
+                        required: ["name"]
+                    }
                 }
             ];
 
@@ -176,6 +201,37 @@ export default async function handler(req, res) {
                                 name: "get_duplicate_statistics",
                                 description: "取得重複訂單的比例與統計建議。",
                                 parameters: { type: "object", properties: {} }
+                            }
+                        },
+                        {
+                            type: "function",
+                            function: {
+                                name: "update_order_by_name",
+                                description: "依訂購人姓名修改其最新的點餐資訊。參數: name, drink_name, spec, topping",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        name: { type: "string", description: "訂購人姓名" },
+                                        drink_name: { type: "string", description: "新的飲料名稱 (選填)" },
+                                        spec: { type: "string", description: "新的規格，如: 無糖/去冰 (選填)" },
+                                        topping: { type: "string", description: "新的加料內容，若要取消加料請傳入『無』 (選填)" }
+                                    },
+                                    required: ["name"]
+                                }
+                            }
+                        },
+                        {
+                            type: "function",
+                            function: {
+                                name: "delete_order_by_name",
+                                description: "依訂購人姓名刪除其最新的點餐紀錄。參數: name",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        name: { type: "string", description: "要刪除點餐紀錄的訂購人姓名" }
+                                    },
+                                    required: ["name"]
+                                }
                             }
                         }
                     ],

@@ -1011,6 +1011,37 @@ function getBrowserToolSchemas() {
                 description: "取得重複訂單的比例與統計建議。",
                 parameters: { type: "object", properties: {} }
             }
+        },
+        {
+            type: "function",
+            function: {
+                name: "update_order_by_name",
+                description: "依訂購人姓名修改其最新的點餐資訊。參數: name, drink_name, spec, topping",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        name: { type: "string", description: "訂購人姓名" },
+                        drink_name: { type: "string", description: "新的飲料名稱 (選填)" },
+                        spec: { type: "string", description: "新的規格，如: 無糖/去冰 (選填)" },
+                        topping: { type: "string", description: "新的加料內容，若要取消加料請傳入『無』 (選填)" }
+                    },
+                    required: ["name"]
+                }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "delete_order_by_name",
+                description: "依訂購人姓名刪除其最新的點餐紀錄。參數: name",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        name: { type: "string", description: "要刪除點餐紀錄的訂購人姓名" }
+                    },
+                    required: ["name"]
+                }
+            }
         }
     ];
 }
@@ -1036,6 +1067,10 @@ async function executeBrowserToolCalls(toolCalls) {
                 resText = executeSearchAllDuplicates();
             } else if (name === "get_duplicate_statistics") {
                 resText = executeGetDuplicateStats();
+            } else if (name === "update_order_by_name") {
+                resText = await executeUpdateOrderByName(args.name, args.drink_name || null, args.spec || null, args.topping || null);
+            } else if (name === "delete_order_by_name") {
+                resText = await executeDeleteOrderByName(args.name);
             } else {
                 resText = `❌ 找不到對應的工具: ${name}`;
             }
@@ -1133,6 +1168,64 @@ function executeSearchAllDuplicates() {
 function executeGetDuplicateStats() {
     runDuplicateStatistics();
     return document.getElementById("dup-results").textContent;
+}
+
+// 7. 修改點餐紀錄工具
+async function executeUpdateOrderByName(name, drinkName, spec, topping) {
+    const userOrders = ordersList.filter(o => o.name === name);
+    if (userOrders.length === 0) {
+        return `❌ 找不到訂購人為 ${name} 的點餐紀錄，無法修改。`;
+    }
+    const targetOrder = userOrders[0]; // 取得最新的那一筆
+    
+    const updatedDrink = drinkName ? fuzzyMatch(drinkName, Object.keys(DRINK_MENU)) : targetOrder.item;
+    if (drinkName && !updatedDrink) {
+        return `❌ 找不到品項「${drinkName}」，請檢查名稱是否正確。`;
+    }
+    
+    let updatedTopping = targetOrder.toppings;
+    if (topping) {
+        if (topping === "無") {
+            updatedTopping = "無";
+        } else {
+            const match = fuzzyMatch(topping, Object.keys(TOPPINGS_MENU));
+            if (match) updatedTopping = match;
+        }
+    }
+    
+    let updatedSpec = targetOrder.spec;
+    if (spec) {
+        updatedSpec = spec.includes("/") ? spec : `${spec}/微冰`;
+    }
+    
+    // 計算價格
+    const basePrice = DRINK_MENU[updatedDrink];
+    const toppingList = updatedTopping && updatedTopping !== "無" ? updatedTopping.split("、") : [];
+    const toppingPrice = toppingList.reduce((sum, t) => sum + TOPPINGS_MENU[t], 0);
+    const total = basePrice + toppingPrice;
+    
+    const payload = {
+        item: updatedDrink,
+        spec: updatedSpec,
+        toppings: updatedTopping,
+        price: total,
+        timestamp: new Date().toISOString()
+    };
+    
+    await collectionRef.doc(targetOrder.id).update(payload);
+    return `✅ 成功為 ${name} 修改訂單！\n🥤 新飲品：${updatedDrink}\n🌡️ 新規格：${updatedSpec}\n💎 新加料：${updatedTopping}\n💰 新金額：$${total} 元\n✨ 資料已即時更新至雲端。`;
+}
+
+// 8. 刪除點餐紀錄工具
+async function executeDeleteOrderByName(name) {
+    const userOrders = ordersList.filter(o => o.name === name);
+    if (userOrders.length === 0) {
+        return `❌ 找不到訂購人為 ${name} 的點餐紀錄，無法刪除。`;
+    }
+    const targetOrder = userOrders[0];
+    
+    await collectionRef.doc(targetOrder.id).delete();
+    return `✅ 已成功為 ${name} 刪除最新的點餐紀錄 (原品項: ${targetOrder.item})！\n✨ 雲端資料庫已即時同步。`;
 }
 
 // --- 11. 輔助工具函式 ---
