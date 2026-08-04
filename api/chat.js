@@ -3,7 +3,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { prompt, keys } = req.body;
+    const { prompt, history, keys } = req.body;
     
     // 獲取金鑰：優先使用前端傳過來的金鑰，次要使用 Vercel 環境變數
     const geminiKey = keys?.geminiKey || process.env.GEMINI_KEY || process.env.GOOGLE_API_KEY;
@@ -86,11 +86,17 @@ export default async function handler(req, res) {
                 }
             ];
 
+            // 將 history 對應為 Gemini API 的 contents
+            const contents = history ? history.map(msg => ({
+                role: msg.role === "assistant" ? "model" : "user",
+                parts: [{ text: msg.content }]
+            })) : [{ parts: [{ text: prompt }] }];
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
+                    contents: contents,
                     systemInstruction: { parts: [{ text: systemInstruction }] },
                     tools: [{ functionDeclarations: tools }],
                     generationConfig: { temperature: 0.7 }
@@ -127,6 +133,11 @@ export default async function handler(req, res) {
 
     if (openaiKey) {
         try {
+            const messages = [
+                { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
+                ...(history || [{ role: "user", content: prompt }])
+            ];
+
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -135,10 +146,7 @@ export default async function handler(req, res) {
                 },
                 body: JSON.stringify({
                     model: "gpt-4o-mini",
-                    messages: [
-                        { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
-                        { role: "user", content: prompt }
-                    ],
+                    messages: messages,
                     tools: [
                         {
                             type: "function",

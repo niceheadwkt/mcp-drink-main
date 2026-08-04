@@ -41,6 +41,9 @@ const collectionRef = db.collection("drink_orders");
 let ordersList = [];
 let isEditing = false;
 let activeCloudProvider = null;
+let chatHistory = [
+    { role: "assistant", content: "想喝什麼？我可以幫您點餐、修改或查重複訂單。" }
+];
 
 // --- 4. DOM 載入與初始化 ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -698,6 +701,7 @@ async function handleChatSend() {
 
     // 顯示使用者對話
     showUserMessage(text);
+    chatHistory.push({ role: "user", content: text });
     
     // 顯示 Bot 載入中
     const loadingMessageId = showLoadingMessage();
@@ -707,14 +711,15 @@ async function handleChatSend() {
         let responseText = "";
 
         if (aiMode === "local") {
-            responseText = await callLocalOllama(text);
+            responseText = await callLocalOllama(chatHistory);
         } else {
-            responseText = await callCloudAI(text);
+            responseText = await callCloudAI(chatHistory);
         }
 
         // 移除載入中訊息並顯示回覆
         removeMessage(loadingMessageId);
         showBotMessage(responseText);
+        chatHistory.push({ role: "assistant", content: responseText });
 
         // 如果回覆中包含 "✅" 符號，代表有成功的寫入/刪除操作，自動在 UI 提示刷新
         if (responseText.includes("✅")) {
@@ -731,7 +736,8 @@ async function handleChatSend() {
 
 // --- 9. 呼叫 AI 服務 API ---
 // A. 本地 Ollama 呼叫 (模擬 OpenAI 介面)
-async function callLocalOllama(userPrompt) {
+// A. 本地 Ollama 呼叫 (模擬 OpenAI 介面)
+async function callLocalOllama(history) {
     const model = localStorage.getItem("local-model");
     if (!model) throw new Error("尚未選擇任何本地 Ollama 模型！");
 
@@ -742,6 +748,8 @@ async function callLocalOllama(userPrompt) {
 4. find_duplicate_orders_by_name: 查詢單人重複訂單 (參數: name)
 5. search_all_duplicates: 全局搜尋所有重複
 6. get_duplicate_statistics: 重複訂單統計
+7. update_order_by_name: 修改點餐
+8. delete_order_by_name: 刪除點餐
 
 如果使用者想查詢菜單，請回答：「我幫你查詢了菜單，菜單如下...」並列出菜單。
 請注意：這是一個極簡本地模型調用，若您的 Ollama 支援 tool call，我們將嘗試直接傳入 function。`;
@@ -749,16 +757,19 @@ async function callLocalOllama(userPrompt) {
     // 為 Ollama 構造 Tools Schema
     const tools = getBrowserToolSchemas();
 
+    // 將 history 中的 role: assistant 改成 role: assistant (相容)
+    const messages = [
+        { role: "system", content: systemPrompt },
+        ...history
+    ];
+
     try {
         const res = await fetch("http://localhost:11434/v1/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 model: model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
+                messages: messages,
                 tools: tools,
                 temperature: 0.7
             })
@@ -779,7 +790,7 @@ async function callLocalOllama(userPrompt) {
 }
 
 // B. 雲端 AI 呼叫 (三向金鑰路由 + Proxy)
-async function callCloudAI(userPrompt) {
+async function callCloudAI(history) {
     const geminiKey = localStorage.getItem("key-gemini");
     const openaiKey = localStorage.getItem("key-openai");
     const anthropicKey = localStorage.getItem("key-anthropic");
@@ -787,22 +798,22 @@ async function callCloudAI(userPrompt) {
 
     // 優先權 1: 瀏覽器本地直連 Gemini (免 CORS 限制)
     if (geminiKey) {
-        return await callGeminiDirectly(userPrompt, geminiKey);
+        return await callGeminiDirectly(history, geminiKey);
     }
 
     // 優先權 2: 瀏覽器本地直連 OpenAI (可能受限於 CORS)
     if (openaiKey) {
-        return await callOpenAIDirectly(userPrompt, openaiKey);
+        return await callOpenAIDirectly(history, openaiKey);
     }
 
     // 優先權 3: 無金鑰，或者是 Anthropic 走中轉 Serverless Proxy
-    return await callVercelProxy(userPrompt, proxyEndpoint, {
+    return await callVercelProxy(history, proxyEndpoint, {
         geminiKey, openaiKey, anthropicKey
     });
 }
 
 // 直連 Gemini
-async function callGeminiDirectly(prompt, apiKey) {
+async function callGeminiDirectly(history, apiKey) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const systemInstruction = "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以調用工具完成點餐、修改、刪除、查詢菜單或搜尋重複訂單。";
     
@@ -817,8 +828,14 @@ async function callGeminiDirectly(prompt, apiKey) {
         };
     });
 
+    // 將 history 對應為 Gemini API 的 contents (role 為 user / model)
+    const contents = history.map(msg => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }]
+    }));
+
     const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: contents,
         systemInstruction: { parts: [{ text: systemInstruction }] },
         tools: [{ functionDeclarations: geminiTools }],
         generationConfig: { temperature: 0.7 }
@@ -882,9 +899,14 @@ async function callGeminiDirectly(prompt, apiKey) {
 }
 
 // 直連 OpenAI
-async function callOpenAIDirectly(prompt, apiKey) {
+async function callOpenAIDirectly(history, apiKey) {
     const url = "https://api.openai.com/v1/chat/completions";
     const tools = getBrowserToolSchemas();
+
+    const messages = [
+        { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
+        ...history
+    ];
 
     const res = await fetch(url, {
         method: "POST",
@@ -894,10 +916,7 @@ async function callOpenAIDirectly(prompt, apiKey) {
         },
         body: JSON.stringify({
             model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
-                { role: "user", content: prompt }
-            ],
+            messages: messages,
             tools: tools,
             temperature: 0.7
         })
@@ -918,13 +937,13 @@ async function callOpenAIDirectly(prompt, apiKey) {
 }
 
 // 呼叫 Vercel 中轉 Proxy
-async function callVercelProxy(prompt, endpoint, localKeys) {
+async function callVercelProxy(history, endpoint, localKeys) {
     try {
-        const res = await fetch(endpoint, {
+        res = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                prompt: prompt,
+                history: history, // 改傳送整個 history
                 keys: localKeys
             })
         });
