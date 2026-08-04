@@ -1277,7 +1277,7 @@ function fuzzyMatchName(input, choices) {
     
     choices.forEach(choice => {
         const score = getSimilarity(input, choice.toLowerCase());
-        if (score > bestScore && score > 0.5) { // 相似度高於 50% 始匹配
+        if (score > bestScore && score >= 0.45) { // 相似度高於 45% 始匹配 (相容 2 字名錯 1 字的 50% 相似度)
             bestScore = score;
             bestMatch = choice;
         }
