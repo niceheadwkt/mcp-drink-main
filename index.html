@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🥤 一沐日雲端點餐系統</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="apple-touch-icon" href="logo.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Google Fonts & Icon -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    
+    <div class="app-container">
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="app-header">
+                <h1>🥤 一沐日 雲端點餐系統</h1>
+                <div class="header-actions">
+                    <button id="toggle-settings" class="btn btn-secondary" title="設定"><i class="fa-solid fa-cog"></i></button>
+                    <button id="toggle-sidebar" class="btn btn-primary" title="AI 助手"><i class="fa-solid fa-robot"></i> AI 助手</button>
+                </div>
+            </header>
+
+            <!-- Order Form Section -->
+            <section class="section-card form-section">
+                <h2 id="form-title"><i class="fa-solid fa-edit"></i> 新增點餐</h2>
+                <form id="order-form">
+                    <input type="hidden" id="edit-id">
+                    
+                    <div class="form-group">
+                        <label for="name"><i class="fa-solid fa-user"></i> 訂購人姓名</label>
+                        <input type="text" id="name" required placeholder="請輸入姓名">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category"><i class="fa-solid fa-tags"></i> 選擇系列</label>
+                            <select id="category"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="item"><i class="fa-solid fa-mug-hot"></i> 選擇飲品</label>
+                            <select id="item"></select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sugar"><i class="fa-solid fa-cubes"></i> 甜度</label>
+                            <select id="sugar">
+                                <option value="正常甜">正常甜</option>
+                                <option value="五分甜">五分甜</option>
+                                <option value="三分甜" selected>三分甜</option>
+                                <option value="一分糖">一分糖</option>
+                                <option value="無糖">無糖</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ice"><i class="fa-solid fa-snowflake"></i> 冰量</label>
+                            <select id="ice">
+                                <option value="正常冰">正常冰</option>
+                                <option value="少冰">少冰</option>
+                                <option value="微冰" selected>微冰</option>
+                                <option value="去冰">去冰</option>
+                                <option value="完全去冰">完全去冰</option>
+                                <option value="熱飲">熱飲</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toppings"><i class="fa-solid fa-circle-plus"></i> 加好料 (可多選，長按/Ctrl 多選)</label>
+                        <select id="toppings" multiple class="toppings-select"></select>
+                    </div>
+
+                    <div class="price-box">
+                        <span>💰 單杯總計：</span>
+                        <strong id="total-price">$0</strong> 元
+                    </div>
+
+                    <div class="form-buttons">
+                        <button type="submit" id="submit-btn" class="btn btn-submit"><i class="fa-solid fa-cloud-arrow-up"></i> 同步至雲端</button>
+                        <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden">取消修改</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Duplicate check Section -->
+            <section class="section-card dup-section">
+                <h2><i class="fa-solid fa-search"></i> 重複訂單檢查</h2>
+                <div class="dup-buttons">
+                    <button id="btn-scan-all" class="btn btn-secondary"><i class="fa-solid fa-globe"></i> 全局掃描重複訂單</button>
+                    <button id="btn-stats" class="btn btn-secondary"><i class="fa-solid fa-chart-pie"></i> 查看重複訂單統計</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="search-name" placeholder="輸入姓名查詢該人的重複訂單">
+                    <button id="btn-search-single" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> 查詢</button>
+                </div>
+                <div id="dup-results" class="results-box hidden"></div>
+            </section>
+
+            <!-- Order List Section -->
+            <section class="section-card list-section">
+                <h2><i class="fa-solid fa-list-check"></i> 已訂購清冊匯總</h2>
+                <div class="table-container">
+                    <table class="calc-table" id="orders-table">
+                        <thead>
+                            <tr>
+                                <th>訂購人</th>
+                                <th>飲品項目</th>
+                                <th>規格</th>
+                                <th>加料</th>
+                                <th>金額</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center">載入資料中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="summary-footer">
+                    <div class="summary-info" id="summary-info">📊 總計：0 杯 | 總金額：$0 元</div>
+                    <button id="btn-download-csv" class="btn btn-secondary"><i class="fa-solid fa-file-csv"></i> 下載訂單 CSV</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Sidebar / Chatbox -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-robot"></i> 飲品小助手</h2>
+                <button id="close-sidebar" class="close-btn">&times;</button>
+            </div>
+            
+            <div class="active-model-status" id="active-model-status">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> 偵測模型中...
+            </div>
+            
+            <div class="chat-history" id="chat-history">
+                <div class="chat-message bot">
+                    <div class="message-content">想喝什麼？我可以幫您點餐、修改或查重複訂單。</div>
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="請輸入對話...">
+                <button id="send-chat" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </aside>
+
+        <!-- Settings Modal / Panel -->
+        <div class="settings-panel" id="settings-panel">
+            <div class="settings-header">
+                <h2><i class="fa-solid fa-cog"></i> 系統與 AI 設定</h2>
+                <button id="close-settings" class="close-btn">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-group">
+                    <h3>💡 運作模式</h3>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="ai-mode" value="cloud" checked>
+                            ☁️ 雲端 AI 模式
+                        </label>
+                        <label>
+                            <input type="radio" name="ai-mode" value="local">
+                            🏠 本地 Ollama 模式
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Cloud Settings -->
+                <div id="cloud-settings-section">
+                    <div class="settings-group">
+                        <h3>🔑 雲端 API 金鑰設定</h3>
+                        <p class="settings-help">儲存於您手機的 localStorage 瀏覽器暫存，不公開傳輸，安全防護。</p>
+                        
+                        <div class="input-field">
+                            <label>Gemini API 金鑰 (優先度 1)</label>
+                            <input type="password" id="key-gemini" placeholder="輸入 API 金鑰">
+                        </div>
+                        <div class="input-field">
+                            <label>OpenAI API 金鑰 (優先度 2)</label>
+                            <input type="password" id="key-openai" placeholder="輸入 API 金鑰">
+                        </div>
+                        <div class="input-field">
+                            <label>Anthropic API 金鑰 (優先度 3)</label>
+                            <input type="password" id="key-anthropic" placeholder="輸入 API 金鑰">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h3>🌐 Vercel 中轉 Proxy 設定</h3>
+                        <p class="settings-help">若您未輸入金鑰，系統將使用託管後端環境變數進行安全中轉。</p>
+                        <div class="input-field">
+                            <label>Proxy 端點</label>
+                            <input type="text" id="proxy-endpoint" value="/api/chat" placeholder="/api/chat">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Local Settings -->
+                <div id="local-settings-section" class="hidden">
+                    <div class="settings-group">
+                        <h3>🏠 本地 Ollama 模型設定</h3>
+                        <div class="input-field">
+                            <label>本地模型清單</label>
+                            <select id="local-model-select">
+                                <option value="">載入中或未偵測到模型...</option>
+                            </select>
+                        </div>
+                        <button id="refresh-local-models" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrows-rotate"></i> 重新整理本地模型</button>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button id="save-settings" class="btn btn-primary"><i class="fa-solid fa-save"></i> 儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <script src="app.js"></script>
+</body>
+</html>
