@@ -741,18 +741,12 @@ async function callLocalOllama(history) {
     const model = localStorage.getItem("local-model");
     if (!model) throw new Error("尚未選擇任何本地 Ollama 模型！");
 
-    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有以下工具：
-1. get_menu: 查詢目前菜單
-2. place_drink_order: 進行點餐 (參數: name, drink_name, spec, topping)
-3. list_recent_orders: 列出最近訂單
-4. find_duplicate_orders_by_name: 查詢單人重複訂單 (參數: name)
-5. search_all_duplicates: 全局搜尋所有重複
-6. get_duplicate_statistics: 重複訂單統計
-7. update_order_by_name: 修改點餐
-8. delete_order_by_name: 刪除點餐
+    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
 
-如果使用者想查詢菜單，請回答：「我幫你查詢了菜單，菜單如下...」並列出菜單。
-請注意：這是一個極簡本地模型調用，若您的 Ollama 支援 tool call，我們將嘗試直接傳入 function。`;
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具就對了！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
 
     // 為 Ollama 構造 Tools Schema
     const tools = getBrowserToolSchemas();
@@ -815,7 +809,12 @@ async function callCloudAI(history) {
 // 直連 Gemini
 async function callGeminiDirectly(history, apiKey) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const systemInstruction = "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以調用工具完成點餐、修改、刪除、查詢菜單或搜尋重複訂單。";
+    const systemInstruction = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
     
     // 整理符合 Gemini 格式的 tools
     const geminiTools = getBrowserToolSchemas().map(t => {
@@ -903,8 +902,15 @@ async function callOpenAIDirectly(history, apiKey) {
     const url = "https://api.openai.com/v1/chat/completions";
     const tools = getBrowserToolSchemas();
 
+    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
+
     const messages = [
-        { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
+        { role: "system", content: systemPrompt },
         ...history
     ];
 

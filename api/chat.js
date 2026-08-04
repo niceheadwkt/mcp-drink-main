@@ -12,7 +12,12 @@ export default async function handler(req, res) {
     if (geminiKey) {
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-            const systemInstruction = "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。";
+            const systemInstruction = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
             const tools = [
                 {
                     name: "get_menu",
@@ -133,8 +138,15 @@ export default async function handler(req, res) {
 
     if (openaiKey) {
         try {
+            const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
+
             const messages = [
-                { role: "system", content: "你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你可以執行點餐、修改、刪除、查詢菜單或搜尋重複訂單。" },
+                { role: "system", content: systemPrompt },
                 ...(history || [{ role: "user", content: prompt }])
             ];
 
