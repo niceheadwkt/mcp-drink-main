@@ -83,18 +83,60 @@ uv pip install -r pyproject.toml
 
 ## 🚀 執行與使用指南
 
-### 方式 A：啟動 Streamlit 網頁 UI (推薦)
-這是最完整的點餐系統介面。您可以使用以下任一指令啟動：
+為了便於您掌握本專案的架構，以下提供了三種執行方式的關聯圖：
+
+```mermaid
+graph TD
+    User([使用者 User])
+
+    subgraph ModeA [方式 A：極致現代美學 PWA 前端]
+        User -->|存取 Port 8000| Browser[手機 PWA / 瀏覽器]
+        Browser -->|載入靜態資源| HttpServer[Python HTTP Server]
+        Browser -->|直接讀寫訂單| Firestore[(Cloud Firestore)]
+        Browser -->|AI 對話與工具解析| AIChat[AI 服務 Gemini/Ollama]
+    end
+
+    subgraph ModeB [方式 B：Streamlit 管理端 UI]
+        User -->|存取 Port 8501| StreamlitApp[Streamlit 應用 drink_app.py]
+        StreamlitApp -->|讀寫訂單| Firestore
+        StreamlitApp -->|AI 對話| AIChat2[AI 服務 Gemini/Ollama]
+        StreamlitApp -->|內部通訊| McpClient[Stdio MCP Client]
+        McpClient -->|呼叫點餐/菜單| McpServer1[mcp_server.py]
+    end
+
+    subgraph ModeC [方式 C：Claude Desktop 掛載]
+        User -->|點餐對話| ClaudeDesktop[Claude Desktop 軟體]
+        ClaudeDesktop -->|STDIO 協定掛載| McpServer2[mcp_server.py]
+        McpServer2 -->|執行點餐寫入| Firestore
+    end
+```
+
+### 方式 A：啟動極致現代美學 PWA 前端 UI (推薦)
+這是整合了設定面板、多 AI 金鑰設定、本地 Ollama 模型選擇的現代毛玻璃美學介面。
+
+您可以透過以下指令啟動本地網頁伺服器：
 ```powershell
-# 透過當前虛擬環境執行 Streamlit (推薦)
+# 使用虛擬環境的 Python 啟動本地網頁伺服器
+.\.venv\Scripts\python.exe -m http.server 8000
+
+# 或使用系統 Python
+python -m http.server 8000
+```
+啟動後，請在瀏覽器開啟 **`http://localhost:8000`**。
+您可以點擊右上角的 ⚙️ 設定圖示，自行填寫 API 金鑰或切換成本地 Ollama 模式。
+
+### 方式 B：啟動 Streamlit 管理端 UI (備用)
+這是基於 Streamlit 的後端數據與管理介面，您可以使用以下任一指令啟動：
+```powershell
+# 透過當前虛擬環境執行 Streamlit
 .\.venv\Scripts\python.exe -m streamlit run drink_app.py
 
 # 或透過 uv 執行
 uv run streamlit run drink_app.py
 ```
-啟動後，瀏覽器會自動開啟 `http://localhost:8501`。您可以在左側或上方看到訂單列表、新增訂單的表單，以及最下方的 **簡易 AI 對話框**。
+啟動後，瀏覽器會自動開啟 `http://localhost:8501`。您可以在此處查看到純文字排版的點餐清單與 AI 側邊欄。
 
-### 方式 B：將 MCP 伺服器掛載至 Claude Desktop
+### 方式 C：將 MCP 伺服器掛載至 Claude Desktop
 您可以將 [mcp_server.py](file:///c:/aiTest/mcp-drink-main/mcp_server.py) 設定到 Claude Desktop 的設定檔中，讓您的 Claude 桌面應用程式直接獲得一沐日點餐的能力：
 
 1. 開啟 Claude Desktop 設定檔：
