@@ -15,6 +15,7 @@ wheels/
 !vercel.json
 !manifest.json
 *API Key*.txt
+Gemini Cli*.txt
 *文件*.txt
 *.lock
 
