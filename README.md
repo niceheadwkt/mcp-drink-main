@@ -77,7 +77,16 @@ uv pip install -r pyproject.toml
   CLAUDE_KEY = "您的_ANTHROPIC_API_KEY"   # 啟用 Anthropic (Claude)
   ```
 * **環境變數支援**：亦支援自動讀取系統環境變數（如 `GOOGLE_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`），本地 NB 執行時免填設定檔。
-* **本地 Ollama 免金鑰**：若選擇本地 Ollama 模式，則無需配置任何 API 金鑰，只需在本地執行 Ollama (`ollama serve`) 即可。
+* **本地 Ollama 免金鑰與 CORS 設定**：若選擇本地 Ollama 模式，則無需配置任何 API 金鑰，只需在本地執行 Ollama (`ollama serve`)。
+  > 💡 **重要提示 (CORS 阻擋問題)**：若在網頁端（如 PWA 前端 `http://localhost:8000`）使用本地 Ollama，必須啟用 **CORS 跨來源共用** 設定，否則瀏覽器會出於安全考量阻擋連線，造成模型清單一直顯示「載入中...」或「無法連線至本地 Ollama (11434)」。
+  > 
+  > **Windows 設定步驟**：
+  > 1. 在系統工作列右下角右鍵點擊 Ollama 小圖示，選擇 **Quit Ollama** 徹底關閉程式。
+  > 2. 新增 Windows 使用者環境變數：
+  >    * **變數名稱 (N)**：`OLLAMA_ORIGINS`
+  >    * **變數值 (V)**：`*`
+  > 3. 重新啟動 **Ollama** 即可解決。
+
 
 ---
 
