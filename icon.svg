@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+    <!-- Cup Glow / Body Gradient -->
+    <linearGradient id="cupGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0.3" />
+    </linearGradient>
+    <!-- Straw Gradient -->
+    <linearGradient id="strawGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="100%" stop-color="#15803d" />
+    </linearGradient>
+    <!-- Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Base Card Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  
+  <!-- Outer Ring (Modern Tech feel) -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#4ade80" stroke-width="4" stroke-opacity="0.2" />
+
+  <!-- Straw (吸管) -->
+  <line x1="280" y1="90" x2="220" y2="280" stroke="url(#strawGrad)" stroke-width="24" stroke-linecap="round" filter="url(#glow)" />
+  
+  <!-- Cup Lid (杯蓋) -->
+  <path d="M 160 190 C 160 170, 352 170, 352 190 Z" fill="#f8fafc" />
+  <rect x="150" y="190" width="212" height="12" rx="6" fill="#e2e8f0" />
+
+  <!-- Cup Body (杯身) -->
+  <path d="M 170 202 L 195 400 C 197 420, 315 420, 317 400 L 342 202 Z" fill="url(#cupGrad)" stroke="#4ade80" stroke-width="3" />
+
+  <!-- Tea Liquid Line (茶液面) -->
+  <path d="M 177 260 C 220 270, 290 250, 335 260 L 340 220 L 172 220 Z" fill="#22c55e" opacity="0.5" />
+
+  <!-- Jellies / Boba (粉粿 / 珍珠) -->
+  <!-- Jelly 1 (招牌粉粿 - Yellow/Golden translucent square) -->
+  <rect x="210" y="350" width="36" height="36" rx="8" fill="#fbbf24" opacity="0.8" transform="rotate(15 228 368)" />
+  <!-- Jelly 2 -->
+  <rect x="260" y="340" width="40" height="40" rx="8" fill="#fbbf24" opacity="0.9" transform="rotate(-10 280 360)" />
+  <!-- Jelly 3 -->
+  <rect x="230" y="370" width="32" height="32" rx="6" fill="#fbbf24" opacity="0.75" transform="rotate(45 246 386)" />
+  
+  <!-- Pearls (珍珠) -->
+  <circle cx="195" cy="380" r="14" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
+  <circle cx="310" cy="370" r="14" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
+  <circle cx="280" cy="385" r="14" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
+  <circle cx="215" cy="330" r="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" opacity="0.8" />
+  <circle cx="295" cy="325" r="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" opacity="0.8" />
+
+  <!-- Emoji Sparkles (微光特效) -->
+  <path d="M 380 120 L 385 135 L 400 140 L 385 145 L 380 160 L 375 145 L 360 140 L 375 135 Z" fill="#4ade80" />
+  <path d="M 120 280 L 123 290 L 133 293 L 123 296 L 120 306 L 117 296 L 107 293 L 117 290 Z" fill="#fbbf24" />
+</svg>

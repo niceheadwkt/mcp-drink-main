@@ -8,6 +8,7 @@
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e293b">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="logo.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -147,12 +148,40 @@
                 <button id="close-sidebar" class="close-btn">&times;</button>
             </div>
             
+            <!-- AI Configuration Section (inline in sidebar) -->
+            <div class="sidebar-settings">
+                <div class="settings-row">
+                    <span class="settings-label"><i class="fa-solid fa-bolt"></i> 模式:</span>
+                    <div class="radio-group-inline">
+                        <label>
+                            <input type="radio" name="ai-mode" value="cloud" checked>
+                            ☁️ 雲端
+                        </label>
+                        <label>
+                            <input type="radio" name="ai-mode" value="local">
+                            🏠 本地
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="local-model-row" class="settings-row hidden">
+                    <span class="settings-label"><i class="fa-solid fa-cubes"></i> 模型:</span>
+                    <div class="select-wrapper">
+                        <select id="local-model-select">
+                            <option value="">偵測中...</option>
+                        </select>
+                        <button id="refresh-local-models" class="refresh-mini-btn" title="重新整理"><i class="fa-solid fa-arrows-rotate"></i></button>
+                    </div>
+                </div>
+            </div>
+
             <div class="active-model-status" id="active-model-status">
                 <i class="fa-solid fa-circle-notch fa-spin"></i> 偵測模型中...
             </div>
             
             <div class="chat-history" id="chat-history">
                 <div class="chat-message bot">
+                    <div class="sender-name"><i class="fa-solid fa-robot"></i> 飲品小助手</div>
                     <div class="message-content">想喝什麼？我可以幫您點餐、修改或查重複訂單。</div>
                 </div>
             </div>
@@ -166,70 +195,32 @@
         <!-- Settings Modal / Panel -->
         <div class="settings-panel" id="settings-panel">
             <div class="settings-header">
-                <h2><i class="fa-solid fa-cog"></i> 系統與 AI 設定</h2>
+                <h2><i class="fa-solid fa-cog"></i> 雲端 API 金鑰設定</h2>
                 <button id="close-settings" class="close-btn">&times;</button>
             </div>
             <div class="settings-body">
-                <div class="settings-group">
-                    <h3>💡 運作模式</h3>
-                    <div class="radio-group">
-                        <label>
-                            <input type="radio" name="ai-mode" value="cloud" checked>
-                            ☁️ 雲端 AI 模式
-                        </label>
-                        <label>
-                            <input type="radio" name="ai-mode" value="local">
-                            🏠 本地 Ollama 模式
-                        </label>
-                    </div>
+                <p class="settings-help">這些金鑰儲存於您瀏覽器的安全暫存（localStorage）中，僅用於對接您的 AI 帳戶或經由 Proxy 進行傳輸。</p>
+                
+                <div class="input-field">
+                    <label>Gemini API 金鑰 (優先度 1)</label>
+                    <input type="password" id="key-gemini" placeholder="輸入 API 金鑰">
                 </div>
-
-                <!-- Cloud Settings -->
-                <div id="cloud-settings-section">
-                    <div class="settings-group">
-                        <h3>🔑 雲端 API 金鑰設定</h3>
-                        <p class="settings-help">儲存於您手機的 localStorage 瀏覽器暫存，不公開傳輸，安全防護。</p>
-                        
-                        <div class="input-field">
-                            <label>Gemini API 金鑰 (優先度 1)</label>
-                            <input type="password" id="key-gemini" placeholder="輸入 API 金鑰">
-                        </div>
-                        <div class="input-field">
-                            <label>OpenAI API 金鑰 (優先度 2)</label>
-                            <input type="password" id="key-openai" placeholder="輸入 API 金鑰">
-                        </div>
-                        <div class="input-field">
-                            <label>Anthropic API 金鑰 (優先度 3)</label>
-                            <input type="password" id="key-anthropic" placeholder="輸入 API 金鑰">
-                        </div>
-                    </div>
-                    
-                    <div class="settings-group">
-                        <h3>🌐 Vercel 中轉 Proxy 設定</h3>
-                        <p class="settings-help">若您未輸入金鑰，系統將使用託管後端環境變數進行安全中轉。</p>
-                        <div class="input-field">
-                            <label>Proxy 端點</label>
-                            <input type="text" id="proxy-endpoint" value="/api/chat" placeholder="/api/chat">
-                        </div>
-                    </div>
+                <div class="input-field">
+                    <label>OpenAI API 金鑰 (優先度 2)</label>
+                    <input type="password" id="key-openai" placeholder="輸入 API 金鑰">
                 </div>
-
-                <!-- Local Settings -->
-                <div id="local-settings-section" class="hidden">
-                    <div class="settings-group">
-                        <h3>🏠 本地 Ollama 模型設定</h3>
-                        <div class="input-field">
-                            <label>本地模型清單</label>
-                            <select id="local-model-select">
-                                <option value="">載入中或未偵測到模型...</option>
-                            </select>
-                        </div>
-                        <button id="refresh-local-models" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrows-rotate"></i> 重新整理本地模型</button>
-                    </div>
+                <div class="input-field">
+                    <label>Anthropic API 金鑰 (優先度 3)</label>
+                    <input type="password" id="key-anthropic" placeholder="輸入 API 金鑰">
+                </div>
+                
+                <div class="input-field">
+                    <label>Vercel 中轉 Proxy 端點</label>
+                    <input type="text" id="proxy-endpoint" value="/api/chat" placeholder="/api/chat">
                 </div>
 
                 <div class="settings-actions">
-                    <button id="save-settings" class="btn btn-primary"><i class="fa-solid fa-save"></i> 儲存設定</button>
+                    <button id="save-settings" class="btn btn-primary"><i class="fa-solid fa-save"></i> 儲存金鑰</button>
                 </div>
             </div>
         </div>
@@ -240,5 +231,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
     <script src="app.js"></script>
+    
+    <!-- Sidebar Backdrop for Mobile -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 </body>
 </html>

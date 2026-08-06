@@ -1,0 +1,10 @@
+*.py
+.venv
+.streamlit
+requirements.txt
+pyproject.toml
+uv.lock
+*.txt
+docs/
+.git
+.gitignore

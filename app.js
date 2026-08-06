@@ -135,9 +135,15 @@ function initEventListeners() {
     // 側邊欄開關
     document.getElementById("toggle-sidebar").addEventListener("click", () => {
         document.getElementById("sidebar").classList.toggle("active");
+        document.getElementById("sidebar-backdrop").classList.toggle("active");
     });
     document.getElementById("close-sidebar").addEventListener("click", () => {
         document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-backdrop").classList.remove("active");
+    });
+    document.getElementById("sidebar-backdrop").addEventListener("click", () => {
+        document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-backdrop").classList.remove("active");
     });
 
     // 設定面板開關
@@ -155,15 +161,23 @@ function initEventListeners() {
     const modeRadios = document.getElementsByName("ai-mode");
     modeRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
-            if (e.target.value === "cloud") {
-                document.getElementById("cloud-settings-section").classList.remove("hidden");
-                document.getElementById("local-settings-section").classList.add("hidden");
+            const val = e.target.value;
+            localStorage.setItem("ai-mode", val);
+            const localModelRow = document.getElementById("local-model-row");
+            if (val === "cloud") {
+                localModelRow.classList.add("hidden");
             } else {
-                document.getElementById("cloud-settings-section").classList.add("hidden");
-                document.getElementById("local-settings-section").classList.remove("hidden");
+                localModelRow.classList.remove("hidden");
                 checkOllamaStatus();
             }
+            detectActiveAIConfig();
         });
+    });
+
+    // 當選取本地模型變更時，立即儲存並更新狀態
+    document.getElementById("local-model-select").addEventListener("change", (e) => {
+        localStorage.setItem("local-model", e.target.value);
+        detectActiveAIConfig();
     });
 
     // 重整本地模型按鈕
@@ -384,17 +398,11 @@ window.deleteOrder = function(id) {
 
 // --- 6. 系統與 AI 設定儲存 ---
 function saveSettings() {
-    const aiMode = document.querySelector('input[name="ai-mode"]:checked').value;
-    localStorage.setItem("ai-mode", aiMode);
-    
     // 儲存金鑰
     localStorage.setItem("key-gemini", document.getElementById("key-gemini").value.trim());
     localStorage.setItem("key-openai", document.getElementById("key-openai").value.trim());
     localStorage.setItem("key-anthropic", document.getElementById("key-anthropic").value.trim());
     localStorage.setItem("proxy-endpoint", document.getElementById("proxy-endpoint").value.trim());
-
-    // 儲存選取的本地模型
-    localStorage.setItem("local-model", document.getElementById("local-model-select").value);
 
     document.getElementById("settings-panel").classList.remove("active");
     detectActiveAIConfig();
@@ -404,12 +412,11 @@ function loadSettings() {
     const aiMode = localStorage.getItem("ai-mode") || "cloud";
     document.querySelector(`input[name="ai-mode"][value="${aiMode}"]`).checked = true;
 
+    const localModelRow = document.getElementById("local-model-row");
     if (aiMode === "cloud") {
-        document.getElementById("cloud-settings-section").classList.remove("hidden");
-        document.getElementById("local-settings-section").classList.add("hidden");
+        localModelRow.classList.add("hidden");
     } else {
-        document.getElementById("cloud-settings-section").classList.add("hidden");
-        document.getElementById("local-settings-section").classList.remove("hidden");
+        localModelRow.classList.remove("hidden");
     }
 
     document.getElementById("key-gemini").value = localStorage.getItem("key-gemini") || "";
@@ -1384,7 +1391,10 @@ function showUserMessage(text) {
     const history = document.getElementById("chat-history");
     const msg = document.createElement("div");
     msg.className = "chat-message user";
-    msg.innerHTML = `<div class="message-content">${escapeHTML(text)}</div>`;
+    msg.innerHTML = `
+        <div class="sender-name"><i class="fa-solid fa-user"></i> 您</div>
+        <div class="message-content">${escapeHTML(text)}</div>
+    `;
     history.appendChild(msg);
     history.scrollTop = history.scrollHeight;
 }
@@ -1395,7 +1405,10 @@ function showBotMessage(text) {
     msg.className = "chat-message bot";
     // 支援換行符號
     const formatted = escapeHTML(text).replace(/\n/g, "<br>");
-    msg.innerHTML = `<div class="message-content">${formatted}</div>`;
+    msg.innerHTML = `
+        <div class="sender-name"><i class="fa-solid fa-robot"></i> 飲品小助手</div>
+        <div class="message-content">${formatted}</div>
+    `;
     history.appendChild(msg);
     history.scrollTop = history.scrollHeight;
 }
@@ -1406,7 +1419,10 @@ function showLoadingMessage() {
     const msg = document.createElement("div");
     msg.className = "chat-message bot";
     msg.id = id;
-    msg.innerHTML = `<div class="message-content"><i class="fa-solid fa-circle-notch fa-spin"></i> AI 正在思考中...</div>`;
+    msg.innerHTML = `
+        <div class="sender-name"><i class="fa-solid fa-robot"></i> 飲品小助手</div>
+        <div class="message-content"><i class="fa-solid fa-circle-notch fa-spin"></i> AI 正在思考中...</div>
+    `;
     history.appendChild(msg);
     history.scrollTop = history.scrollHeight;
     return id;

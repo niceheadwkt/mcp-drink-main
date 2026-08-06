@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🥤 一沐日雲端點餐與 MCP 系統專案簡報</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Mermaid JS for diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            theme: 'dark',
+            startOnLoad: true,
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'cardinal' }
+        });
+    </script>
+
+    <style>
+        :root {
+            --primary: #f59e0b;
+            --primary-hover: #d97706;
+            --bg-grad: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+            background: var(--bg-grad);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Ambient glowing backgrounds */
+        .glowing-orbs {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--accent);
+            bottom: -150px;
+            right: -150px;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, 30px) scale(1.1); }
+        }
+
+        /* Slides Wrapper */
+        .presentation-container {
+            position: relative;
+            width: 90%;
+            max-width: 1100px;
+            height: 80vh;
+            max-height: 700px;
+            z-index: 10;
+        }
+
+        .slides-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 48px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: scale(0.95) translateY(20px);
+            pointer-events: none;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Header within Slide */
+        .slide-header {
+            margin-bottom: 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 16px;
+        }
+
+        .slide-header h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slide-header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-top: 4px;
+        }
+
+        /* Slide Content styles */
+        .slide-body {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 1.15rem;
+            line-height: 1.8;
+        }
+
+        /* Title Slide Custom styling */
+        .slide.title-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .title-slide h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.2;
+            background: linear-gradient(to right, #ffffff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        .title-slide h3 {
+            font-size: 1.8rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-bottom: 32px;
+        }
+
+        .title-slide .badge {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--primary);
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            display: inline-block;
+        }
+
+        /* Lists and Cards grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            height: 100%;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-4px);
+        }
+
+        .card h3 {
+            color: var(--primary);
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .highlight-box {
+            background: rgba(16, 185, 129, 0.08);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        li {
+            position: relative;
+            padding-left: 28px;
+            margin-bottom: 12px;
+        }
+
+        li::before {
+            content: "✦";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Diagram Slide Styling */
+        .diagram-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 12px;
+            height: calc(100% - 10px);
+            overflow: hidden;
+        }
+
+        .diagram-container pre.mermaid {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        .diagram-container svg {
+            max-width: 100% !important;
+            max-height: 100% !important;
+            height: auto !important;
+        }
+
+        /* Navigation controls */
+        .controls {
+            position: absolute;
+            bottom: -60px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 20;
+        }
+
+        .btn-nav {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .btn-nav:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+
+        .btn-nav:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .progress-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            background: var(--primary);
+            transform: scale(1.3);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Keyboard hint */
+        .keyboard-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 10px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        kbd {
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: inherit;
+            color: #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="glowing-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="presentation-container">
+        <div class="slides-container">
+            
+            <!-- Slide 0: Cover -->
+            <section class="slide title-slide active">
+                <span class="badge"><i class="fa-solid fa-code"></i> AI & PWA & MCP Stack</span>
+                <h1>一沐日雲端點餐與 MCP 系統</h1>
+                <h3>專案簡報與核心技術亮點</h3>
+                <div style="color: var(--text-muted); font-size: 0.95rem; margin-top: 10px;">
+                    報告人：Antigravity Agent | 2026年8月
+                </div>
+            </section>
+
+            <!-- Slide 1: Origin -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-circle-question"></i> 專案緣起與核心痛點</h2>
+                    <p>為何我們需要智慧化的飲品點購方案？</p>
+                </div>
+                <div class="slide-body">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-triangle-exclamation"></i> 傳統團購的瓶頸</h3>
+                            <ul>
+                                <li><strong>人工統計混亂</strong>：每到下午茶，統計品項、加料、冰甜規格繁雜，極易出錯。</li>
+                                <li><strong>流程死板繁複</strong>：需要發起人逐一建立表單，或大家在群組刷訊息，不易彙整。</li>
+                                <li><strong>重複訂單漏洞</strong>：多人代點、二次點餐導致點錯或多點，造成浪費。</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> 智慧化突破口</h3>
+                            <ul>
+                                <li><strong>對話式語意點單</strong>：用語音或口語直接說：「一杯粉粿檸檬去冰無糖」，AI 自動處理。</li>
+                                <li><strong>主動除錯與驗證</strong>：系統自動過濾重複點單，語意自動填補，規避常規出錯。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 2: Architecture -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-network-wired"></i> 系統架構概覽</h2>
+                    <p>三維多模態運作，覆蓋所有點餐入口</p>
+                </div>
+                <div class="slide-body">
+                    <div class="diagram-container">
+                        <pre class="mermaid">
+graph TD
+    User([使用者 User])
+    style User fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff
+
+    subgraph ModeA [PWA 前端 Port 8000]
+        User -->|網頁 UI / 手機 App| Browser[毛玻璃 PWA 介面]
+        Browser -->|同步變更| Firestore[(Cloud Firestore)]
+    end
+
+    subgraph ModeB [Streamlit 管理端 Port 8501]
+        User -->|側邊欄 AI 對話| StreamlitApp[Streamlit 點餐助理]
+        StreamlitApp -->|內部通訊| McpClient[Stdio MCP Client]
+        McpClient -->|呼叫 Tools| McpServer[mcp_server.py]
+        McpServer -->|寫入/修改/統計| Firestore
+    end
+
+    subgraph ModeC [Claude Desktop 掛載]
+        User -->|對話點餐| ClaudeDesktop[Claude Desktop 軟體]
+        ClaudeDesktop -->|掛載 MCP| McpServer
+    end
+                        </pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 3: Frontend -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-display"></i> 前端美學與使用者體驗 (UX/UI)</h2>
+                    <p>極致毛玻璃微動畫與雙模式 AI 助手</p>
+                </div>
+                <div class="slide-body">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-mobile-screen-button"></i> PWA 毛玻璃極致前端 (Port: 8000)</h3>
+                            <ul>
+                                <li><strong>玻璃擬物設計 (Glassmorphism)</strong>：半透明毛玻璃特效，創造高端商用體驗。</li>
+                                <li><strong>無縫 PWA 安裝</strong>：支援手機安裝至主畫面，提供滿版 RWD 佈局與 iOS 安全底邊邊距。</li>
+                                <li><strong>動態試算</strong>：加料與基底價格即時變更，一鍵推送雲端。</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3><i class="fa-solid fa-robot"></i> Streamlit 管理側邊欄 (Port: 8501)</h3>
+                            <ul>
+                                <li><strong>雙模式 AI 引擎</strong>：完美支援雲端模型（Gemini/Claude）及本地 Ollama 模型。</li>
+                                <li><strong>本地模型自動偵測</strong>：一鍵偵測本地運行的 Ollama，並優先推薦 `gemma4`。</li>
+                                <li><strong>離線安全性</strong>：本地模式免 API Key，保障隱私與資安。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 4: MCP -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-bolt"></i> MCP (Model Context Protocol) 技術解密</h2>
+                    <p>AI Agent 連接現實世界的標準協定</p>
+                </div>
+                <div class="slide-body">
+                    <div class="highlight-box">
+                        <strong>什麼是 MCP？</strong> MCP 是一套開放協定，讓大語言模型 (LLM) 擺脫只聊天的局限，直接獲得調用內部資料庫、寫入檔案、刪改資料等「主動執行」的能力。
+                    </div>
+                    <div class="grid-2" style="margin-top: 16px;">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-cubes"></i> 專案 FastMCP Tools 清冊</h3>
+                            <ul style="font-size: 0.95rem; line-height: 1.6;">
+                                <li>`get_menu`：暴露即時菜單結構供 AI 比對。</li>
+                                <li>`place_drink_order`：口語化解析，自動計價並儲存。</li>
+                                <li>`update_drink_order`：智慧更新，如「把剛才那杯改成去冰」。</li>
+                                <li>`delete_drink_order`：取消訂單或特定人的單子。</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3><i class="fa-solid fa-chart-pie"></i> 查重與統計 Tools</h3>
+                            <ul style="font-size: 0.95rem; line-height: 1.6;">
+                                <li>`search_all_duplicates`：掃描資料庫中潛在的重複點單。</li>
+                                <li>`get_duplicate_statistics`：分析重複訂單的比率與重複王。</li>
+                                <li>讓 AI 助手能在一秒內為發起人整理出「點單分析報告」。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 5: Backend & Robustness -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-server"></i> 後端資料庫與強大容錯設計</h2>
+                    <p>確保系統流暢無阻的基石</p>
+                </div>
+                <div class="slide-body">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-code-compare"></i> RapidFuzz 模糊匹配</h3>
+                            <ul>
+                                <li>使用者說「桂花檸檬」，自動對應選單中「粉粿桂花檸檬」。</li>
+                                <li>容許語意口誤與同音字，顯著提升 AI 助理的調用成功率。</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3><i class="fa-solid fa-shield-halved"></i> 類型安全與 Pydantic 修復</h3>
+                            <ul>
+                                <li>徹底修復修改訂單時傳遞 None 產生的類型驗證錯誤。</li>
+                                <li>導入 `Optional[str]` 的安全校正，實現無間斷運行。</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="highlight-box" style="margin-top: 20px;">
+                        <i class="fa-solid fa-database"></i> <strong>雲端同步</strong>：採用 Google Cloud Firestore 以 Singleton 單例模式運行，確保高併發下連線數最小化，速度最快。
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 6: Future -->
+            <section class="slide">
+                <div class="slide-header">
+                    <h2><i class="fa-solid fa-forward"></i> 專案優勢與未來展望</h2>
+                    <p>下一步，我們去往何方？</p>
+                </div>
+                <div class="slide-body">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-trophy"></i> 專案亮點總結</h3>
+                            <ul>
+                                <li><strong>極速點單</strong>：一句口語 3 秒完成點餐。</li>
+                                <li><strong>多端掛載</strong>：一條程式碼，多處運行。</li>
+                                <li><strong>高性價比</strong>：支持 Ollama 本地模型，0 雲端 API 成本。</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3><i class="fa-solid fa-lightbulb"></i> 未來藍圖</h3>
+                            <ul>
+                                <li><strong>自動收款對接</strong>：整合行動支付 (LINE Pay) 自動計費並輸出 QR Code。</li>
+                                <li><strong>即時多人協作</strong>：WebSockets 即時更新，讓同事互看點單狀態。</li>
+                                <li><strong>統計圖表化</strong>：自動產生熱門飲品圓餅圖。</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <h3 style="text-align: center; margin-top: 36px; color: var(--primary); font-size: 1.6rem;">🥤 感謝聆聽，讓我們一起聰明喝飲料！</h3>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Navigation buttons -->
+        <div class="controls">
+            <button class="btn-nav" id="prev-btn" disabled><i class="fa-solid fa-chevron-left"></i></button>
+            <div class="progress-dots" id="dots-container"></div>
+            <button class="btn-nav" id="next-btn"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <div class="keyboard-hint">
+        使用鍵盤 <kbd>←</kbd> <kbd>→</kbd> 或空白鍵切換投影片
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const dotsContainer = document.getElementById('dots-container');
+        let currentSlideIdx = 0;
+
+        // Dynamic Dot creation
+        slides.forEach((_, idx) => {
+            const dot = document.createElement('div');
+            dot.classList.add('dot');
+            if (idx === 0) dot.classList.add('active');
+            dot.addEventListener('click', () => goSlide(idx));
+            dotsContainer.appendChild(dot);
+        });
+
+        const dots = document.querySelectorAll('.dot');
+
+        function updateControls() {
+            prevBtn.disabled = currentSlideIdx === 0;
+            nextBtn.disabled = currentSlideIdx === slides.length - 1;
+            
+            dots.forEach((dot, idx) => {
+                if (idx === currentSlideIdx) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        function goSlide(idx) {
+            if (idx < 0 || idx >= slides.length) return;
+            
+            // Remove active class from old slide
+            slides[currentSlideIdx].classList.remove('active');
+            
+            // Set new active slide
+            currentSlideIdx = idx;
+            slides[currentSlideIdx].classList.add('active');
+            
+            updateControls();
+            
+            // Re-render mermaid diagrams if visible
+            mermaid.run({
+                nodes: document.querySelectorAll('.slide.active .mermaid')
+            });
+        }
+
+        // Button listeners
+        prevBtn.addEventListener('click', () => goSlide(currentSlideIdx - 1));
+        nextBtn.addEventListener('click', () => goSlide(currentSlideIdx + 1));
+
+        // Keyboard listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                goSlide(currentSlideIdx + 1);
+            } else if (e.key === 'ArrowLeft') {
+                goSlide(currentSlideIdx - 1);
+            }
+        });
+    </script>
+</body>
+</html>

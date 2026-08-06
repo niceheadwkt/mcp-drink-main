@@ -1,11 +1,12 @@
-const CACHE_NAME = "drink-pwa-v2";
+const CACHE_NAME = "drink-pwa-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./logo.png"
+  "./logo.png",
+  "./icon.svg"
 ];
 
 // 安裝時快取靜態資源

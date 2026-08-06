@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 預設拒絕所有存取，這是最高強度的安全起點
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 針對使用者資料夾的特定規則
+    // 假設你的資料路徑是 /users/{userId} 或 /users/{userId}/...
+    match /users/{userId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+    
+    // 針對特定功能（例如飲料訂單 drink_app）的規則
+    // 限制只有登入後的使用者可以讀寫自己的訂單
+    match /orders/{orderId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}

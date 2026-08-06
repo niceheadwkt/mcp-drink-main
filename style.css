@@ -126,7 +126,7 @@ body {
 
 input[type="text"], select, textarea {
     background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
     border-radius: 8px;
     padding: 12px;
     color: var(--text-main);
@@ -296,18 +296,41 @@ input[type="text"]:focus, select:focus {
 .sidebar {
     width: 380px;
     background: rgba(15, 23, 42, 0.9);
-    border-left: 1px solid var(--border-color);
+    border: 1px solid var(--border-color);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 40px);
+    height: auto;
+    max-height: calc(100vh - 40px);
     position: sticky;
     top: 20px;
     border-radius: 16px;
     box-shadow: var(--shadow);
     z-index: 100;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    align-self: flex-start;
+}
+
+
+/* Sidebar Backdrop for Mobile Drawer */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 99; /* Just below desktop sidebar (z-index 100) or mobile (z-index 150) */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .sidebar-header {
@@ -321,6 +344,74 @@ input[type="text"]:focus, select:focus {
 .sidebar-header h2 {
     font-size: 1.15rem;
     color: var(--primary);
+}
+
+/* Sidebar Inline Settings */
+.sidebar-settings {
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.4);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.settings-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.radio-group-inline {
+    display: flex;
+    gap: 12px;
+}
+
+.radio-group-inline label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.select-wrapper {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+}
+
+.select-wrapper select {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    height: 34px;
+    flex: 1;
+}
+
+.refresh-mini-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-main);
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.refresh-mini-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .active-model-status {
@@ -338,6 +429,21 @@ input[type="text"]:focus, select:focus {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-height: 0;
+}
+
+.sender-name {
+    font-size: 0.75rem;
+    color: var(--primary);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.8;
+}
+.chat-message.user .sender-name {
+    color: var(--text-muted);
+    align-self: flex-end;
 }
 
 .chat-message {
@@ -363,8 +469,9 @@ input[type="text"]:focus, select:focus {
 }
 
 .bot .message-content {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(74, 222, 128, 0.08);
     color: var(--text-main);
+    border: 1px solid rgba(74, 222, 128, 0.15);
     border-top-left-radius: 2px;
 }
 
@@ -384,6 +491,12 @@ input[type="text"]:focus, select:focus {
 
 .chat-input-area input {
     flex: 1;
+    border: 1.5px solid rgba(74, 222, 128, 0.45);
+    background: rgba(15, 23, 42, 0.8);
+}
+.chat-input-area input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.25);
 }
 
 /* Settings Modal */
@@ -523,7 +636,7 @@ input[type="text"]:focus, select:focus {
         position: fixed;
         bottom: 0;
         left: 0;
-        height: 60vh;
+        height: 75vh;
         z-index: 150;
         border-left: none;
         border-top: 1px solid var(--border-color);
@@ -534,5 +647,9 @@ input[type="text"]:focus, select:focus {
     
     .sidebar.active {
         transform: translateY(0);
+    }
+    
+    .sidebar-backdrop {
+        z-index: 140; /* Make sure it sits right below sidebar on mobile */
     }
 }
