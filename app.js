@@ -1098,7 +1098,7 @@ async function getCachedModels() {
         { id: "Qwen2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
         { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
         { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
-        { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
+        { id: "gemma-2-2b-it-q4f16_1-MLC", name: "Gemma 2 2B" }
     ];
     
     // 1. 檢測 Cache Storage
@@ -1164,7 +1164,7 @@ async function updateCacheManagerUI() {
         { id: "Qwen2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
         { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
         { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
-        { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
+        { id: "gemma-2-2b-it-q4f16_1-MLC", name: "Gemma 2 2B" }
     ];
     
     if (cachedModelIds.length === 0) {
