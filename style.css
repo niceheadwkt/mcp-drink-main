@@ -141,6 +141,11 @@ input[type="text"]:focus, select:focus {
     box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
 }
 
+select option {
+    background-color: #1e293b; /* 固定的深色背景，防瀏覽器原生 Light 模式白色背景 */
+    color: #f8fafc;            /* 淺色文字 */
+}
+
 .toppings-select {
     height: 120px;
 }
