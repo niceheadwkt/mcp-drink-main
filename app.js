@@ -474,21 +474,35 @@ async function checkOllamaStatus() {
 
     try {
         let models = [];
+        let connected = false;
         
         // 嘗試 1：Ollama API 格式 (/api/tags)
         let res = await fetch(`${localApiUrl}/api/tags`).catch(() => null);
-        if (res && res.ok) {
-            const data = await res.json();
-            const rawModels = data.models || [];
-            models = rawModels.map(m => ({ name: m.name, size: m.size || 0 }));
-        } else {
-            // 嘗試 2：OpenAI / PocketPal 格式 (/v1/models)
-            res = await fetch(`${localApiUrl}/v1/models`).catch(() => null);
-            if (res && res.ok) {
+        if (res) {
+            connected = true;
+            if (res.ok) {
                 const data = await res.json();
-                const rawModels = data.data || [];
-                models = rawModels.map(m => ({ name: m.id, size: 0 }));
+                const rawModels = data.models || [];
+                models = rawModels.map(m => ({ name: m.name, size: m.size || 0 }));
             }
+        }
+        
+        // 如果第一個嘗試連不上或者沒有模型，嘗試第二個
+        if (!connected || models.length === 0) {
+            // 嘗試 2：OpenAI / PocketPal 格式 (/v1/models)
+            const res2 = await fetch(`${localApiUrl}/v1/models`).catch(() => null);
+            if (res2) {
+                connected = true;
+                if (res2.ok) {
+                    const data = await res2.json();
+                    const rawModels = data.data || [];
+                    models = rawModels.map(m => ({ name: m.id, size: 0 }));
+                }
+            }
+        }
+
+        if (!connected) {
+            throw new Error("無法連線至該端點");
         }
 
         if (models.length > 0) {
@@ -514,7 +528,7 @@ async function checkOllamaStatus() {
             
             detectActiveAIConfig();
         } else {
-            select.innerHTML = "<option value=''>已連線，但服務端未下載任何模型</option>";
+            select.innerHTML = "<option value=''>已連線，但服務端未下載或載入任何模型</option>";
         }
     } catch (e) {
         select.innerHTML = `<option value=''>無法連線至本地 API (${localApiUrl.replace(/^https?:\/\//, "")})</option>`;
@@ -522,6 +536,7 @@ async function checkOllamaStatus() {
         refBtn.disabled = false;
     }
 }
+
 
 
 // --- 7. 重複訂單檢查核心邏輯 (客戶端極速處理) ---
