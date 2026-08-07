@@ -164,11 +164,22 @@ function initEventListeners() {
             const val = e.target.value;
             localStorage.setItem("ai-mode", val);
             const localModelRow = document.getElementById("local-model-row");
+            const webllmModelRow = document.getElementById("webllm-model-row");
+            const webllmProgressRow = document.getElementById("webllm-progress-row");
+            
+            // 隱藏進度條
+            if (webllmProgressRow) webllmProgressRow.classList.add("hidden");
+
             if (val === "cloud") {
                 localModelRow.classList.add("hidden");
-            } else {
+                webllmModelRow.classList.add("hidden");
+            } else if (val === "local") {
                 localModelRow.classList.remove("hidden");
+                webllmModelRow.classList.add("hidden");
                 checkOllamaStatus();
+            } else if (val === "webllm") {
+                localModelRow.classList.add("hidden");
+                webllmModelRow.classList.remove("hidden");
             }
             detectActiveAIConfig();
         });
@@ -180,8 +191,15 @@ function initEventListeners() {
         detectActiveAIConfig();
     });
 
+    // 當選取網頁內置模型變更時，立即儲存並更新狀態
+    document.getElementById("webllm-model-select").addEventListener("change", (e) => {
+        localStorage.setItem("webllm-model", e.target.value);
+        detectActiveAIConfig();
+    });
+
     // 重整本地模型按鈕
     document.getElementById("refresh-local-models").addEventListener("click", checkOllamaStatus);
+
 
     // 表單送出 (新增/修改)
     document.getElementById("order-form").addEventListener("submit", handleOrderSubmit);
@@ -414,10 +432,16 @@ function loadSettings() {
     document.querySelector(`input[name="ai-mode"][value="${aiMode}"]`).checked = true;
 
     const localModelRow = document.getElementById("local-model-row");
+    const webllmModelRow = document.getElementById("webllm-model-row");
     if (aiMode === "cloud") {
         localModelRow.classList.add("hidden");
-    } else {
+        webllmModelRow.classList.add("hidden");
+    } else if (aiMode === "local") {
         localModelRow.classList.remove("hidden");
+        webllmModelRow.classList.add("hidden");
+    } else if (aiMode === "webllm") {
+        localModelRow.classList.add("hidden");
+        webllmModelRow.classList.remove("hidden");
     }
 
     document.getElementById("key-gemini").value = localStorage.getItem("key-gemini") || "";
@@ -425,6 +449,9 @@ function loadSettings() {
     document.getElementById("key-anthropic").value = localStorage.getItem("key-anthropic") || "";
     document.getElementById("proxy-endpoint").value = localStorage.getItem("proxy-endpoint") || "/api/chat";
     document.getElementById("local-api-url").value = localStorage.getItem("local-api-url") || "http://localhost:11434";
+
+    const savedWebLLMModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    document.getElementById("webllm-model-select").value = savedWebLLMModel;
 }
 
 
@@ -437,6 +464,13 @@ function detectActiveAIConfig() {
         const localModel = localStorage.getItem("local-model") || "載入中...";
         statusEl.innerHTML = `🟢 模式: 🏠 本地 Ollama | 模型: <code>${localModel}</code>`;
         activeCloudProvider = "Ollama";
+        return;
+    }
+
+    if (aiMode === "webllm") {
+        const webllmModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+        statusEl.innerHTML = `🟢 模式: 🌐 內置 AI | 模型: <code>${webllmModel.split("-q4f")[0]}</code>`;
+        activeCloudProvider = "WebLLM";
         return;
     }
 
@@ -752,9 +786,12 @@ async function handleChatSend() {
 
         if (aiMode === "local") {
             responseText = await callLocalOllama(chatHistory);
+        } else if (aiMode === "webllm") {
+            responseText = await callWebLLM(chatHistory);
         } else {
             responseText = await callCloudAI(chatHistory);
         }
+
 
         // 移除載入中訊息並顯示回覆
         removeMessage(loadingMessageId);
@@ -825,6 +862,148 @@ async function callLocalOllama(history) {
         throw new Error(`無法連線至本地 API (${localApiUrl.replace(/^https?:\/\//, "")})，請確認服務已啟動且無 CORS 限制。詳細錯誤: ${e.message}`);
     }
 }
+
+
+// WebLLM Engine 實例與狀態
+let webllmEngine = null;
+let currentWebLLMModel = "";
+
+async function callWebLLM(history) {
+    const model = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    
+    // 如果引擎未初始化，或者選擇的模型改變了，則需要重新載入
+    if (!webllmEngine || currentWebLLMModel !== model) {
+        // 顯示進度條 UI
+        const progressRow = document.getElementById("webllm-progress-row");
+        const progressLabel = document.getElementById("webllm-progress-label");
+        const progressPercent = document.getElementById("webllm-progress-percent");
+        const progressBar = document.getElementById("webllm-progress-bar");
+        
+        if (progressRow) progressRow.classList.remove("hidden");
+        
+        try {
+            if (progressLabel) progressLabel.textContent = "正在載入 WebLLM 模組...";
+            // 動態匯入 WebLLM
+            const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
+            
+            if (progressLabel) progressLabel.textContent = `載入大模型中 (${model.split("-q4f")[0]})...`;
+            
+            webllmEngine = await CreateMLCEngine(model, {
+                initProgressCallback: (progress) => {
+                    const pct = Math.round(progress.progress * 100);
+                    if (progressPercent) progressPercent.textContent = `${pct}%`;
+                    if (progressBar) progressBar.style.width = `${pct}%`;
+                    if (progressLabel) {
+                        progressLabel.textContent = progress.text.length > 30 ? progress.text.substring(0, 30) + "..." : progress.text;
+                    }
+                }
+            });
+            currentWebLLMModel = model;
+            
+            // 下載載入完成後隱藏進度條
+            if (progressRow) progressRow.classList.add("hidden");
+        } catch (err) {
+            if (progressRow) progressRow.classList.add("hidden");
+            throw new Error(`初始化網頁內置 AI 失敗。可能因為您的瀏覽器不支援 WebGPU。詳細錯誤: ${err.message}`);
+        }
+    }
+
+    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+
+🚨 核心行為準則：
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具就對了！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
+
+    const tools = getBrowserToolSchemas();
+    const messages = [
+        { role: "system", content: systemPrompt },
+        ...history
+    ];
+
+    try {
+        const reply = await webllmEngine.chat.completions.create({
+            messages: messages,
+            tools: tools,
+            temperature: 0.7
+        });
+
+        const message = reply.choices[0].message;
+
+        // 處理本地 tool call
+        if (message.tool_calls && message.tool_calls.length > 0) {
+            return await executeBrowserToolCalls(message.tool_calls);
+        }
+        return message.content || "（網頁內置 AI 未傳回文字）";
+    } catch (e) {
+        throw new Error(`網頁內置 AI 推理失敗：${e.message}`);
+    }
+}
+
+// 單個模型快取清除函數
+window.clearWebLLMCache = async function() {
+    const model = document.getElementById("webllm-model-select").value;
+    if (!model) {
+        alert("請先選擇要刪除的內置 AI 模型！");
+        return;
+    }
+    
+    const displayName = model.split("-q4f")[0];
+    if (!confirm(`您確定要清除瀏覽器中「${displayName}」的快取模型嗎？\n這將釋放該模型佔用的裝置儲存空間（約數百 MB 至 2 GB），但下次選用該模型時需要重新下載。`)) {
+        return;
+    }
+    
+    let deletedCount = 0;
+    
+    // 1. 清除 Cache Storage 中屬於該模型的檔案
+    try {
+        const cacheNames = await caches.keys();
+        for (let cacheName of cacheNames) {
+            if (cacheName.toLowerCase().includes("webllm") || cacheName.toLowerCase().includes("mlc")) {
+                const cache = await caches.open(cacheName);
+                const requests = await cache.keys();
+                const targetKey = model.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "");
+                for (let request of requests) {
+                    const url = request.url.toLowerCase().replace(/[-_]/g, "");
+                    // 比對 URL 中是否包含該模型名稱的主要特徵
+                    if (url.includes(targetKey) || url.includes(targetKey.replace("instruct", ""))) {
+                        await cache.delete(request);
+                        deletedCount++;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Cache API clear failed:", e);
+    }
+    
+    // 2. 清除 OPFS 中對應的模型資料夾
+    try {
+        if (navigator.storage && navigator.storage.getDirectory) {
+            const root = await navigator.storage.getDirectory();
+            const targetDirKey = model.toLowerCase().split("-mlc")[0];
+            for await (const [name, handle] of root.entries()) {
+                if (name.toLowerCase().includes(targetDirKey) || targetDirKey.includes(name.toLowerCase())) {
+                    await root.removeEntry(name, { recursive: true });
+                    deletedCount++;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("OPFS clear failed:", e);
+    }
+    
+    // 如果當前引擎正在運行該模型，釋放引擎
+    if (webllmEngine && currentWebLLMModel === model) {
+        try {
+            await webllmEngine.unload();
+        } catch(e) {}
+        webllmEngine = null;
+        currentWebLLMModel = "";
+    }
+    
+    alert(`🧹 內置 AI 模型「${displayName}」的快取已清除完成！`);
+};
 
 
 // B. 雲端 AI 呼叫 (三向金鑰路由 + Proxy)
