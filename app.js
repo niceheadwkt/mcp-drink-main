@@ -959,9 +959,9 @@ async function callWebLLM(history) {
 3. 只有當你獲得「[系統工具執行結果]」之後，你才能使用流暢的繁體中文文字總結並回覆給用戶。
 
 🚨 意圖與工具對照表（請嚴格對齊）：
-* 「點餐」/「訂餐」/「來一杯」（例如：小平平【訂】一杯...）：呼叫 "place_drink_order" 工具。
+* 「點餐」/「訂餐」/「來一杯」/「我要點」（例如：小平平【訂】一杯牡丹蕎麥茶，去冰無糖，不加料）：這代表新增點餐，【必須】呼叫 "place_drink_order" 工具，即使包含「不加料」或「無糖」等否定詞，也絕對是「點餐」而不是刪除！
 * 「修改」/「改成」/「加料」（例如：小胖胖【改】少冰...）：呼叫 "update_order_by_name" 工具。
-* 「刪除」/「取消」/「不要了」（例如：取消小平平的點餐）：呼叫 "delete_order_by_name" 工具。
+* 「刪除」/「取消」/「不要了」/「退訂」（例如：取消小平平的點餐）：呼叫 "delete_order_by_name" 工具。
 * 「菜單」/「有賣什麼」：呼叫 "get_menu" 工具。
 
 🚨 呼叫範例（Few-Shot）：
@@ -979,6 +979,20 @@ async function callWebLLM(history) {
   }
 }
 
+使用者輸入：「小平平訂一杯牡丹蕎麥茶，去冰無糖，不加料」
+你的 JSON 輸出：
+{
+  "tool_call": {
+    "name": "place_drink_order",
+    "arguments": {
+      "name": "小平平",
+      "drink_name": "牡丹蕎麥茶",
+      "spec": "無糖/去冰",
+      "topping": "無"
+    }
+  }
+}
+
 使用者輸入：「幫小胖胖修改，改成少冰無糖」
 你的 JSON 輸出：
 {
@@ -987,6 +1001,17 @@ async function callWebLLM(history) {
     "arguments": {
       "name": "小胖胖",
       "spec": "無糖/少冰"
+    }
+  }
+}
+
+使用者輸入：「不要了，幫小新取消點餐」
+你的 JSON 輸出：
+{
+  "tool_call": {
+    "name": "delete_order_by_name",
+    "arguments": {
+      "name": "小新"
     }
   }
 }
@@ -1005,7 +1030,7 @@ async function callWebLLM(history) {
 3. "delete_order_by_name": 刪除點餐。參數:
    - "name": 姓名 (必要)
 4. "get_menu": 查詢菜單。無參數。
-5. "list_recent_orders": 列出最近訂單。無參數。
+5. "list_recent_orders": 列出最近訂單。無參數.
 6. "find_duplicate_orders_by_name": 查詢個人重複點餐。參數: "name"
 7. "search_all_duplicates": 掃描全部重複。無參數.
 8. "get_duplicate_statistics": 重複統計報告。無參數。`;
@@ -1020,7 +1045,7 @@ async function callWebLLM(history) {
         for (let loop = 0; loop < maxLoops; loop++) {
             const reply = await webllmEngine.chat.completions.create({
                 messages: localMessages,
-                temperature: 0.3
+                temperature: 0.1
             });
 
             const content = reply.choices[0].message.content || "";
