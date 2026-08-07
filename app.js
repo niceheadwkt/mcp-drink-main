@@ -149,6 +149,7 @@ function initEventListeners() {
     // 設定面板開關
     document.getElementById("toggle-settings").addEventListener("click", () => {
         document.getElementById("settings-panel").classList.add("active");
+        updateCacheManagerUI();
     });
     document.getElementById("close-settings").addEventListener("click", () => {
         document.getElementById("settings-panel").classList.remove("active");
@@ -939,6 +940,90 @@ async function callWebLLM(history) {
         throw new Error(`網頁內置 AI 推理失敗：${e.message}`);
     }
 }
+// 取得已下載快取的模型列表
+async function getCachedModels() {
+    const cachedModels = new Set();
+    const allModels = [
+        { id: "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
+        { id: "Qwen-2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
+        { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
+        { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
+        { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
+    ];
+    
+    // 1. 檢測 Cache Storage
+    try {
+        const cacheNames = await caches.keys();
+        for (let cacheName of cacheNames) {
+            if (cacheName.toLowerCase().includes("webllm") || cacheName.toLowerCase().includes("mlc")) {
+                const cache = await caches.open(cacheName);
+                const requests = await cache.keys();
+                for (let request of requests) {
+                    const url = request.url.toLowerCase().replace(/[-_]/g, "");
+                    for (let m of allModels) {
+                        const targetKey = m.id.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "");
+                        if (url.includes(targetKey)) {
+                            cachedModels.add(m.id);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("getCachedModels cache check error:", e);
+    }
+    
+    // 2. 檢測 OPFS
+    try {
+        if (navigator.storage && navigator.storage.getDirectory) {
+            const root = await navigator.storage.getDirectory();
+            for (let m of allModels) {
+                const targetDirKey = m.id.toLowerCase().split("-mlc")[0];
+                for await (const [name, handle] of root.entries()) {
+                    if (name.toLowerCase().includes(targetDirKey) || targetDirKey.includes(name.toLowerCase())) {
+                        cachedModels.add(m.id);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("getCachedModels OPFS check error:", e);
+    }
+    
+    return Array.from(cachedModels);
+}
+
+// 動態更新快取管理 UI
+async function updateCacheManagerUI() {
+    const container = document.getElementById("cache-manager-container");
+    const select = document.getElementById("cache-model-select");
+    if (!container || !select) return;
+    
+    const cachedModelIds = await getCachedModels();
+    
+    const allModels = [
+        { id: "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
+        { id: "Qwen-2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
+        { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
+        { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
+        { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
+    ];
+    
+    if (cachedModelIds.length === 0) {
+        container.style.display = "none";
+    } else {
+        container.style.display = "block";
+        select.innerHTML = "";
+        allModels.forEach(m => {
+            if (cachedModelIds.includes(m.id)) {
+                const opt = document.createElement("option");
+                opt.value = m.id;
+                opt.textContent = m.name;
+                select.appendChild(opt);
+            }
+        });
+    }
+}
 
 // 單個模型快取清除函數
 window.clearWebLLMCache = async function() {
@@ -1002,9 +1087,11 @@ window.clearWebLLMCache = async function() {
         currentWebLLMModel = "";
     }
     
+    // 重新檢查與更新 UI，若無模型快取則隱藏區塊
+    await updateCacheManagerUI();
+    
     alert(`🧹 內置 AI 模型「${displayName}」的快取已清除完成！`);
 };
-
 
 // B. 雲端 AI 呼叫 (三向金鑰路由 + Proxy)
 async function callCloudAI(history) {
