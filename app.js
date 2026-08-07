@@ -1044,10 +1044,7 @@ async function callWebLLM(history) {
                             }
                         }]);
                         
-                        // 將工具執行結果加入對話歷史，並讓模型進行下一輪推理
-                        localMessages.push({ role: "assistant", content: content });
-                        localMessages.push({ role: "user", content: `[系統工具執行結果]:\n${toolCallResult}` });
-                        continue;
+                        return toolCallResult;
                     }
                 } catch (jsonErr) {
                     console.warn("Failed to parse tool call JSON from WebLLM response:", jsonText, jsonErr);
