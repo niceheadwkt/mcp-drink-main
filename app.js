@@ -403,6 +403,7 @@ function saveSettings() {
     localStorage.setItem("key-openai", document.getElementById("key-openai").value.trim());
     localStorage.setItem("key-anthropic", document.getElementById("key-anthropic").value.trim());
     localStorage.setItem("proxy-endpoint", document.getElementById("proxy-endpoint").value.trim());
+    localStorage.setItem("local-api-url", document.getElementById("local-api-url").value.trim());
 
     document.getElementById("settings-panel").classList.remove("active");
     detectActiveAIConfig();
@@ -423,7 +424,9 @@ function loadSettings() {
     document.getElementById("key-openai").value = localStorage.getItem("key-openai") || "";
     document.getElementById("key-anthropic").value = localStorage.getItem("key-anthropic") || "";
     document.getElementById("proxy-endpoint").value = localStorage.getItem("proxy-endpoint") || "/api/chat";
+    document.getElementById("local-api-url").value = localStorage.getItem("local-api-url") || "http://localhost:11434";
 }
+
 
 // 偵測目前啟用的 AI 客戶端
 function detectActiveAIConfig() {
@@ -466,25 +469,37 @@ async function checkOllamaStatus() {
     select.innerHTML = "<option>偵測連線中...</option>";
     refBtn.disabled = true;
 
-    try {
-        const res = await fetch("http://localhost:11434/api/tags");
-        if (res.ok) {
-            const data = await res.json();
-            const models = data.models || [];
-            select.innerHTML = "";
-            
-            if (models.length === 0) {
-                select.innerHTML = "<option value=''>未偵測到任何已下載的模型</option>";
-                refBtn.disabled = false;
-                return;
-            }
+    // 取得自訂的 API 網址，去掉尾端斜線
+    let localApiUrl = (localStorage.getItem("local-api-url") || "http://localhost:11434").replace(/\/+$/, "");
 
+    try {
+        let models = [];
+        
+        // 嘗試 1：Ollama API 格式 (/api/tags)
+        let res = await fetch(`${localApiUrl}/api/tags`).catch(() => null);
+        if (res && res.ok) {
+            const data = await res.json();
+            const rawModels = data.models || [];
+            models = rawModels.map(m => ({ name: m.name, size: m.size || 0 }));
+        } else {
+            // 嘗試 2：OpenAI / PocketPal 格式 (/v1/models)
+            res = await fetch(`${localApiUrl}/v1/models`).catch(() => null);
+            if (res && res.ok) {
+                const data = await res.json();
+                const rawModels = data.data || [];
+                models = rawModels.map(m => ({ name: m.id, size: 0 }));
+            }
+        }
+
+        if (models.length > 0) {
+            select.innerHTML = "";
             let defaultIdx = 0;
             models.forEach((m, idx) => {
                 const opt = document.createElement("option");
                 opt.value = m.name;
-                opt.textContent = `${m.name} (${(m.size / (1024*1024*1024)).toFixed(1)}GB)`;
-                if (m.name.toLowerCase().includes("gemma4")) defaultIdx = idx;
+                const sizeText = m.size ? ` (${(m.size / (1024*1024*1024)).toFixed(1)}GB)` : "";
+                opt.textContent = `${m.name}${sizeText}`;
+                if (m.name.toLowerCase().includes("gemma") || m.name.toLowerCase().includes("qwen")) defaultIdx = idx;
                 select.appendChild(opt);
             });
             
@@ -498,13 +513,16 @@ async function checkOllamaStatus() {
             }
             
             detectActiveAIConfig();
+        } else {
+            select.innerHTML = "<option value=''>已連線，但服務端未下載任何模型</option>";
         }
     } catch (e) {
-        select.innerHTML = "<option value=''>無法連線至本地 Ollama (11434)</option>";
+        select.innerHTML = `<option value=''>無法連線至本地 API (${localApiUrl.replace(/^https?:\/\//, "")})</option>`;
     } finally {
         refBtn.disabled = false;
     }
 }
+
 
 // --- 7. 重複訂單檢查核心邏輯 (客戶端極速處理) ---
 function analyzeDuplicates() {
@@ -764,8 +782,11 @@ async function callLocalOllama(history) {
         ...history
     ];
 
+    // 取得自訂的 API 網址，去掉尾端斜線
+    let localApiUrl = (localStorage.getItem("local-api-url") || "http://localhost:11434").replace(/\/+$/, "");
+
     try {
-        const res = await fetch("http://localhost:11434/v1/chat/completions", {
+        const res = await fetch(`${localApiUrl}/v1/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -776,7 +797,7 @@ async function callLocalOllama(history) {
             })
         });
 
-        if (!res.ok) throw new Error(`Ollama 回傳錯誤: ${res.statusText}`);
+        if (!res.ok) throw new Error(`本地 API 回傳錯誤: ${res.statusText}`);
         const data = await res.json();
         const message = data.choices[0].message;
 
@@ -786,9 +807,10 @@ async function callLocalOllama(history) {
         }
         return message.content || "（本地模型未傳回文字）";
     } catch (e) {
-        throw new Error(`無法連線至本地 Ollama，請確認服務已啟動。詳細錯誤: ${e.message}`);
+        throw new Error(`無法連線至本地 API (${localApiUrl.replace(/^https?:\/\//, "")})，請確認服務已啟動且無 CORS 限制。詳細錯誤: ${e.message}`);
     }
 }
+
 
 // B. 雲端 AI 呼叫 (三向金鑰路由 + Proxy)
 async function callCloudAI(history) {
