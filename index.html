@@ -161,6 +161,10 @@
                             <input type="radio" name="ai-mode" value="local">
                             🏠 本地
                         </label>
+                        <label>
+                            <input type="radio" name="ai-mode" value="webllm">
+                            🌐 內置
+                        </label>
                     </div>
                 </div>
                 
@@ -173,7 +177,31 @@
                         <button id="refresh-local-models" class="refresh-mini-btn" title="重新整理"><i class="fa-solid fa-arrows-rotate"></i></button>
                     </div>
                 </div>
+
+                <div id="webllm-model-row" class="settings-row hidden">
+                    <span class="settings-label"><i class="fa-solid fa-brain"></i> 內置 AI:</span>
+                    <div class="select-wrapper">
+                        <select id="webllm-model-select">
+                            <option value="Qwen-2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B (推薦中文, 1.1GB)</option>
+                            <option value="Qwen-2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B (強大中文, 2.2GB)</option>
+                            <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (極速, 600MB)</option>
+                            <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B (平衡, 1.8GB)</option>
+                            <option value="Gemma-2-2B-it-q4f16_1-MLC">Gemma 2 2B (Google, 1.6GB)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="webllm-progress-row" class="settings-row hidden" style="flex-direction: column; align-items: stretch;">
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; width: 100%;">
+                        <span id="webllm-progress-label" style="opacity: 0.8;">模型載入中...</span>
+                        <span id="webllm-progress-percent" style="font-weight: bold; color: var(--primary-color);">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                        <div id="webllm-progress-bar" style="width: 0%; height: 100%; background: var(--primary-color, #10b981); transition: width 0.2s ease;"></div>
+                    </div>
+                </div>
             </div>
+
 
             <div class="active-model-status" id="active-model-status">
                 <i class="fa-solid fa-circle-notch fa-spin"></i> 偵測模型中...
@@ -224,10 +252,25 @@
                     <input type="text" id="local-api-url" value="http://localhost:11434" placeholder="http://localhost:11434">
                 </div>
 
-
-                <div class="settings-actions">
-                    <button id="save-settings" class="btn btn-primary"><i class="fa-solid fa-save"></i> 儲存金鑰</button>
+                <div class="input-field" style="margin-top: 15px;">
+                    <label>🧹 管理內置 AI 快取模型 (選取並刪除)</label>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 5px;">
+                        <select id="cache-model-select" style="flex: 2; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; outline: none; font-size: 14px;">
+                            <option value="Qwen-2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B</option>
+                            <option value="Qwen-2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B</option>
+                            <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B</option>
+                            <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B</option>
+                            <option value="Gemma-2-2B-it-q4f16_1-MLC">Gemma 2 2B</option>
+                        </select>
+                        <button id="clear-webllm-cache" class="btn btn-secondary" style="flex: 1; height: 38px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; white-space: nowrap;" onclick="clearWebLLMCache()"><i class="fa-solid fa-trash"></i> 清除快取</button>
+                    </div>
                 </div>
+
+                <div class="settings-actions" style="margin-top: 20px;">
+                    <button id="save-settings" class="btn btn-primary" style="width: 100%;"><i class="fa-solid fa-save"></i> 儲存設定</button>
+                </div>
+
+
             </div>
         </div>
     </div>

@@ -938,11 +938,9 @@ async function callWebLLM(history) {
     } catch (e) {
         throw new Error(`網頁內置 AI 推理失敗：${e.message}`);
     }
-}
-
 // 單個模型快取清除函數
 window.clearWebLLMCache = async function() {
-    const model = document.getElementById("webllm-model-select").value;
+    const model = document.getElementById("cache-model-select").value;
     if (!model) {
         alert("請先選擇要刪除的內置 AI 模型！");
         return;
