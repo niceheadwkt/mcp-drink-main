@@ -194,9 +194,23 @@ function initEventListeners() {
 
     // 當選取網頁內置模型變更時，立即儲存並更新狀態
     document.getElementById("webllm-model-select").addEventListener("change", (e) => {
-        localStorage.setItem("webllm-model", e.target.value);
+        const val = e.target.value;
+        localStorage.setItem("webllm-model", val);
+        const customRow = document.getElementById("webllm-custom-model-row");
+        if (val === "custom") {
+            customRow.classList.remove("hidden");
+        } else {
+            customRow.classList.add("hidden");
+        }
         detectActiveAIConfig();
     });
+
+    // 監聽自訂模型輸入變更
+    document.getElementById("webllm-custom-model-input").addEventListener("input", (e) => {
+        localStorage.setItem("webllm-custom-model", e.target.value.trim());
+        detectActiveAIConfig();
+    });
+
 
     // 重整本地模型按鈕
     document.getElementById("refresh-local-models").addEventListener("click", checkOllamaStatus);
@@ -453,6 +467,16 @@ function loadSettings() {
 
     const savedWebLLMModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
     document.getElementById("webllm-model-select").value = savedWebLLMModel;
+
+    const savedCustomModel = localStorage.getItem("webllm-custom-model") || "";
+    document.getElementById("webllm-custom-model-input").value = savedCustomModel;
+
+    const customRow = document.getElementById("webllm-custom-model-row");
+    if (savedWebLLMModel === "custom") {
+        customRow.classList.remove("hidden");
+    } else {
+        customRow.classList.add("hidden");
+    }
 }
 
 
@@ -469,7 +493,11 @@ function detectActiveAIConfig() {
     }
 
     if (aiMode === "webllm") {
-        const webllmModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+        let webllmModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+        if (webllmModel === "custom") {
+            const customModel = localStorage.getItem("webllm-custom-model") || "";
+            webllmModel = customModel ? `自訂: ${customModel}` : "請輸入自訂模型 ID";
+        }
         statusEl.innerHTML = `🟢 模式: 🌐 內置 AI | 模型: <code>${webllmModel.split("-q4f")[0]}</code>`;
         activeCloudProvider = "WebLLM";
         return;
@@ -870,7 +898,13 @@ let webllmEngine = null;
 let currentWebLLMModel = "";
 
 async function callWebLLM(history) {
-    const model = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    let model = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    if (model === "custom") {
+        model = localStorage.getItem("webllm-custom-model") || "";
+        if (!model) {
+            throw new Error("請先在側邊欄輸入您想使用的自訂 WebLLM 模型 ID！");
+        }
+    }
     
     // 如果引擎未初始化，或者選擇的模型改變了，則需要重新載入
     if (!webllmEngine || currentWebLLMModel !== model) {
@@ -959,11 +993,22 @@ async function getCachedModels() {
                 const cache = await caches.open(cacheName);
                 const requests = await cache.keys();
                 for (let request of requests) {
-                    const url = request.url.toLowerCase().replace(/[-_]/g, "");
+                    const url = request.url;
+                    let matched = false;
+                    const urlLower = url.toLowerCase().replace(/[-_]/g, "");
                     for (let m of allModels) {
                         const targetKey = m.id.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "");
-                        if (url.includes(targetKey)) {
+                        if (urlLower.includes(targetKey)) {
                             cachedModels.add(m.id);
+                            matched = true;
+                        }
+                    }
+                    // 自訂模型的 Hugging Face 解析
+                    if (!matched && url.includes("/resolve/main/")) {
+                        const parts = url.split("/resolve/main/")[0].split("/");
+                        const modelId = parts[parts.length - 1];
+                        if (modelId && modelId.toLowerCase().includes("mlc")) {
+                            cachedModels.add(modelId);
                         }
                     }
                 }
@@ -977,12 +1022,9 @@ async function getCachedModels() {
     try {
         if (navigator.storage && navigator.storage.getDirectory) {
             const root = await navigator.storage.getDirectory();
-            for (let m of allModels) {
-                const targetDirKey = m.id.toLowerCase().split("-mlc")[0];
-                for await (const [name, handle] of root.entries()) {
-                    if (name.toLowerCase().includes(targetDirKey) || targetDirKey.includes(name.toLowerCase())) {
-                        cachedModels.add(m.id);
-                    }
+            for await (const [name, handle] of root.entries()) {
+                if (name.toLowerCase().includes("mlc")) {
+                    cachedModels.add(name);
                 }
             }
         }
@@ -1014,13 +1056,13 @@ async function updateCacheManagerUI() {
     } else {
         container.style.display = "block";
         select.innerHTML = "";
-        allModels.forEach(m => {
-            if (cachedModelIds.includes(m.id)) {
-                const opt = document.createElement("option");
-                opt.value = m.id;
-                opt.textContent = m.name;
-                select.appendChild(opt);
-            }
+        
+        cachedModelIds.forEach(id => {
+            const opt = document.createElement("option");
+            opt.value = id;
+            const staticMatch = allModels.find(m => m.id === id);
+            opt.textContent = staticMatch ? staticMatch.name : `自訂: ${id.split("-q4f")[0]}`;
+            select.appendChild(opt);
         });
     }
 }
@@ -1047,10 +1089,11 @@ window.clearWebLLMCache = async function() {
             if (cacheName.toLowerCase().includes("webllm") || cacheName.toLowerCase().includes("mlc")) {
                 const cache = await caches.open(cacheName);
                 const requests = await cache.keys();
-                const targetKey = model.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "");
+                // 找出該模型的特徵字根
+                const rawKey = model.toLowerCase().replace(/[-_]/g, "");
+                const targetKey = model.includes("-MLC") ? model.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "") : rawKey;
                 for (let request of requests) {
                     const url = request.url.toLowerCase().replace(/[-_]/g, "");
-                    // 比對 URL 中是否包含該模型名稱的主要特徵
                     if (url.includes(targetKey) || url.includes(targetKey.replace("instruct", ""))) {
                         await cache.delete(request);
                         deletedCount++;
@@ -1066,7 +1109,7 @@ window.clearWebLLMCache = async function() {
     try {
         if (navigator.storage && navigator.storage.getDirectory) {
             const root = await navigator.storage.getDirectory();
-            const targetDirKey = model.toLowerCase().split("-mlc")[0];
+            const targetDirKey = model.includes("-MLC") ? model.toLowerCase().split("-mlc")[0] : model.toLowerCase();
             for await (const [name, handle] of root.entries()) {
                 if (name.toLowerCase().includes(targetDirKey) || targetDirKey.includes(name.toLowerCase())) {
                     await root.removeEntry(name, { recursive: true });
