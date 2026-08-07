@@ -1142,9 +1142,9 @@ async function getCachedModels() {
                 for (let request of requests) {
                     const url = request.url;
                     let matched = false;
-                    const urlLower = url.toLowerCase().replace(/[-_]/g, "");
+                    const urlLower = url.toLowerCase().replace(/[^a-z0-9]/g, "");
                     for (let m of allModels) {
-                        const targetKey = m.id.split("-MLC")[0].toLowerCase().replace(/[-_]/g, "");
+                        const targetKey = m.id.split("-MLC")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
                         if (urlLower.includes(targetKey)) {
                             cachedModels.add(m.id);
                             matched = true;
@@ -1171,7 +1171,17 @@ async function getCachedModels() {
             const root = await navigator.storage.getDirectory();
             for await (const [name, handle] of root.entries()) {
                 if (name.toLowerCase().includes("mlc")) {
-                    cachedModels.add(name);
+                    // 嘗試以字母數字模糊匹配 allModels，若符合則對齊 ID，否則直接加入
+                    const nameClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    let matchedId = name;
+                    for (let m of allModels) {
+                        const targetKey = m.id.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        if (nameClean.includes(targetKey) || targetKey.includes(nameClean)) {
+                            matchedId = m.id;
+                            break;
+                        }
+                    }
+                    cachedModels.add(matchedId);
                 }
             }
         }
