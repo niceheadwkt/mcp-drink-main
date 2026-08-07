@@ -1123,6 +1123,7 @@ async function callWebLLM(history) {
 }
 // 取得已下載快取的模型列表
 async function getCachedModels() {
+    console.log("[getCachedModels] 開始檢測本地快取...");
     const cachedModels = new Set();
     const allModels = [
         { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
@@ -1135,10 +1136,18 @@ async function getCachedModels() {
     // 1. 檢測 Cache Storage
     try {
         const cacheNames = await caches.keys();
+        console.log("[getCachedModels] 找到的 Cache Storage 列表:", cacheNames);
         for (let cacheName of cacheNames) {
             if (cacheName.toLowerCase().includes("webllm") || cacheName.toLowerCase().includes("mlc")) {
                 const cache = await caches.open(cacheName);
                 const requests = await cache.keys();
+                console.log(`[getCachedModels] 快取 "${cacheName}" 中共有 ${requests.length} 筆請求紀錄`);
+                
+                // 印出前 3 筆 URL 供偵錯參考
+                if (requests.length > 0) {
+                    console.log(`[getCachedModels] 前幾筆 URL 範例:`, requests.slice(0, 3).map(r => r.url));
+                }
+
                 for (let request of requests) {
                     const url = request.url;
                     let matched = false;
@@ -1169,27 +1178,37 @@ async function getCachedModels() {
     try {
         if (navigator.storage && navigator.storage.getDirectory) {
             const root = await navigator.storage.getDirectory();
+            const opfsEntries = [];
             for await (const [name, handle] of root.entries()) {
+                opfsEntries.push(name);
                 if (name.toLowerCase().includes("mlc")) {
                     // 嘗試以字母數字模糊匹配 allModels，若符合則對齊 ID，否則直接加入
                     const nameClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
                     let matchedId = name;
+                    let staticMatched = false;
                     for (let m of allModels) {
                         const targetKey = m.id.toLowerCase().replace(/[^a-z0-9]/g, "");
                         if (nameClean.includes(targetKey) || targetKey.includes(nameClean)) {
                             matchedId = m.id;
+                            staticMatched = true;
                             break;
                         }
                     }
+                    console.log(`[getCachedModels] OPFS 偵測到模型目錄 "${name}" -> 匹配為 ID: "${matchedId}" (靜態對齊: ${staticMatched})`);
                     cachedModels.add(matchedId);
                 }
             }
+            console.log("[getCachedModels] OPFS 完整目錄列表:", opfsEntries);
+        } else {
+            console.log("[getCachedModels] 瀏覽器不支援 OPFS");
         }
     } catch (e) {
         console.warn("getCachedModels OPFS check error:", e);
     }
     
-    return Array.from(cachedModels);
+    const result = Array.from(cachedModels);
+    console.log("[getCachedModels] 最終偵測到的快取模型 ID 列表:", result);
+    return result;
 }
 
 // 動態更新快取管理 UI
