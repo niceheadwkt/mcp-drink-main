@@ -465,7 +465,7 @@ function loadSettings() {
     document.getElementById("proxy-endpoint").value = localStorage.getItem("proxy-endpoint") || "/api/chat";
     document.getElementById("local-api-url").value = localStorage.getItem("local-api-url") || "http://localhost:11434";
 
-    const savedWebLLMModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    const savedWebLLMModel = localStorage.getItem("webllm-model") || "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
     document.getElementById("webllm-model-select").value = savedWebLLMModel;
 
     const savedCustomModel = localStorage.getItem("webllm-custom-model") || "";
@@ -493,7 +493,7 @@ function detectActiveAIConfig() {
     }
 
     if (aiMode === "webllm") {
-        let webllmModel = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+        let webllmModel = localStorage.getItem("webllm-model") || "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
         if (webllmModel === "custom") {
             const customModel = localStorage.getItem("webllm-custom-model") || "";
             webllmModel = customModel ? `自訂: ${customModel}` : "請輸入自訂模型 ID";
@@ -898,7 +898,7 @@ let webllmEngine = null;
 let currentWebLLMModel = "";
 
 async function callWebLLM(history) {
-    let model = localStorage.getItem("webllm-model") || "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC";
+    let model = localStorage.getItem("webllm-model") || "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
     if (model === "custom") {
         model = localStorage.getItem("webllm-custom-model") || "";
         if (!model) {
@@ -978,8 +978,8 @@ async function callWebLLM(history) {
 async function getCachedModels() {
     const cachedModels = new Set();
     const allModels = [
-        { id: "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
-        { id: "Qwen-2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
+        { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
+        { id: "Qwen2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
         { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
         { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
         { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
@@ -1044,8 +1044,8 @@ async function updateCacheManagerUI() {
     const cachedModelIds = await getCachedModels();
     
     const allModels = [
-        { id: "Qwen-2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
-        { id: "Qwen-2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
+        { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 1.5B" },
+        { id: "Qwen2.5-3B-Instruct-q4f16_1-MLC", name: "Qwen 2.5 3B" },
         { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", name: "Llama 3.2 1B" },
         { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", name: "Llama 3.2 3B" },
         { id: "Gemma-2-2B-it-q4f16_1-MLC", name: "Gemma 2 2B" }
