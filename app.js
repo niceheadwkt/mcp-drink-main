@@ -943,33 +943,98 @@ async function callWebLLM(history) {
         }
     }
 
-    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。你擁有並可隨時調用點餐、修改、刪除、查詢菜單與重複檢查的工具。
+    const systemPrompt = `你是一個專業的飲品訂單助手。請一律使用「繁體中文」回答。
+你擁有以下可調用的工具，用於點餐、修改、刪除、查詢菜單與重複檢查。
+
+🚨 工具呼叫格式規範：
+當你認為需要調用工具時，請【嚴格只輸出一個 JSON 物件】來進行工具呼叫，不要包含任何額外的解釋文字或 Markdown 外框。格式如下：
+{
+  "tool_call": {
+    "name": "工具名稱",
+    "arguments": {
+      "參數名": "參數值"
+    }
+  }
+}
+
+可用的工具清單與參數說明：
+1. "get_menu": 查詢目前所有的飲品品項、價格以及可加料的內容。無參數。
+2. "place_drink_order": 點餐。參數:
+   - "name": 訂購人姓名 (必要，如："小圓圓")
+   - "drink_name": 飲料名稱 (必要)
+   - "spec": 甜度與冰量，如 "三分甜/微冰" (必要)
+   - "topping": 加料內容，如 "招牌粉粿"，若無則為 "無"
+3. "list_recent_orders": 列出最近的所有訂單資訊。無參數。
+4. "find_duplicate_orders_by_name": 搜尋特定人物的重複訂單資料。參數: "name"
+5. "search_all_duplicates": 掃描全部訂單，找出所有有重複訂單的人物。無參數。
+6. "get_duplicate_statistics": 取得重複訂單的比例與統計建議。無參數。
+7. "update_order_by_name": 依姓名修改點餐。當使用者要求「修改規格」或「加料/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，請立即呼叫此工具。參數:
+   - "name": 訂購人姓名 (必要)
+   - "drink_name": 新飲料名稱 (選填)
+   - "spec": 新規格，如 "無糖/去冰" (選填)
+   - "topping": 新加料，取消加料傳 "無" (選填)
+8. "delete_order_by_name": 刪除某人點餐。參數:
+   - "name": 訂購人姓名 (必要)
 
 🚨 核心行為準則：
-1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」（例如：「幫國炯加琥珀粉圓」、「把小甜甜改成去冰」）時，不論使用者有沒有提供飲料名稱，請【立即直接調用】 "update_order_by_name" 工具。工具會自動在雲端資料庫中搜尋該使用者是否有既有訂單並進行修改。不要事先詢問使用者飲料名稱或規格，先調用工具就對了！
-2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接調用】 "delete_order_by_name" 工具。
-3. 任何工具呼叫執行後，請將工具回傳的結果直接呈現給使用者。`;
+1. 【修改與加料】：當使用者要求「修改規格」或「幫某人加/換料」時，不論使用者有沒有提供飲料名稱，請【立即直接輸出 JSON 呼叫】 "update_order_by_name" 工具。不要事先詢問，先呼叫工具就對了！
+2. 【刪除與取消】：當使用者要求刪除或取消點餐時，請【立即直接輸出 JSON 呼叫】 "delete_order_by_name" 工具。
+3. 任何工具呼叫執行後，系統會自動提供執行結果給你，屆時請將結果用流暢的繁體中文總結回覆給用戶。`;
 
-    const tools = getBrowserToolSchemas();
-    const messages = [
+    let localMessages = [
         { role: "system", content: systemPrompt },
         ...history
     ];
 
     try {
-        const reply = await webllmEngine.chat.completions.create({
-            messages: messages,
-            tools: tools,
-            temperature: 0.7
-        });
+        let maxLoops = 3;
+        for (let loop = 0; loop < maxLoops; loop++) {
+            const reply = await webllmEngine.chat.completions.create({
+                messages: localMessages,
+                temperature: 0.3
+            });
 
-        const message = reply.choices[0].message;
-
-        // 處理本地 tool call
-        if (message.tool_calls && message.tool_calls.length > 0) {
-            return await executeBrowserToolCalls(message.tool_calls);
+            const content = reply.choices[0].message.content || "";
+            
+            // 嘗試解析是否包含 JSON 工具呼叫
+            let jsonText = content.trim();
+            if (jsonText.includes("```")) {
+                const match = jsonText.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
+                if (match) jsonText = match[1].trim();
+            }
+            
+            if (jsonText.startsWith("{") && jsonText.endsWith("}")) {
+                try {
+                    const parsed = JSON.parse(jsonText);
+                    if (parsed.tool_call) {
+                        const toolName = parsed.tool_call.name;
+                        const toolArgs = parsed.tool_call.arguments || {};
+                        
+                        console.log(`[WebLLM Prompt-based Tool Call]: ${toolName}`, toolArgs);
+                        
+                        // 執行本地工具模擬
+                        const toolCallResult = await executeBrowserToolCalls([{
+                            id: `webllm_call_${Date.now()}`,
+                            function: {
+                                name: toolName,
+                                arguments: JSON.stringify(toolArgs)
+                            }
+                        }]);
+                        
+                        // 將工具執行結果加入對話歷史，並讓模型進行下一輪推理
+                        localMessages.push({ role: "assistant", content: content });
+                        localMessages.push({ role: "user", content: `[系統工具執行結果]:\n${toolCallResult}` });
+                        continue;
+                    }
+                } catch (jsonErr) {
+                    console.warn("Failed to parse tool call JSON from WebLLM response:", jsonText, jsonErr);
+                }
+            }
+            
+            return content;
         }
-        return message.content || "（網頁內置 AI 未傳回文字）";
+        
+        throw new Error("模型工具呼叫超出最大限制次數。");
     } catch (e) {
         throw new Error(`網頁內置 AI 推理失敗：${e.message}`);
     }
