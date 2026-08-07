@@ -857,10 +857,25 @@ async function callLocalOllama(history) {
     // 為 Ollama 構造 Tools Schema
     const tools = getBrowserToolSchemas();
 
-    // 將 history 中的 role: assistant 改成 role: assistant (相容)
+    // 過濾歷史紀錄，避免小模型模仿先前的文字工具執行結果而不呼叫工具
+    const filteredHistory = [];
+    for (let i = 0; i < history.length; i++) {
+        const msg = history[i];
+        if (msg.role === "assistant") {
+            const content = msg.content || "";
+            if (content.startsWith("✅") || content.startsWith("❌") || content.includes("成功為") || content.includes("找不到") || content.includes("最新 10 筆") || content.includes("重複訂單")) {
+                if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === "user") {
+                    filteredHistory.pop();
+                }
+                continue;
+            }
+        }
+        filteredHistory.push(msg);
+    }
+
     const messages = [
         { role: "system", content: systemPrompt },
-        ...history
+        ...filteredHistory
     ];
 
     // 取得自訂的 API 網址，去掉尾端斜線
@@ -1035,9 +1050,25 @@ async function callWebLLM(history) {
 7. "search_all_duplicates": 掃描全部重複。無參數.
 8. "get_duplicate_statistics": 重複統計報告。無參數。`;
 
+    // 過濾歷史紀錄，避免小模型模仿先前的文字工具執行結果而不呼叫工具
+    const filteredHistory = [];
+    for (let i = 0; i < history.length; i++) {
+        const msg = history[i];
+        if (msg.role === "assistant") {
+            const content = msg.content || "";
+            if (content.startsWith("✅") || content.startsWith("❌") || content.includes("成功為") || content.includes("找不到") || content.includes("最新 10 筆") || content.includes("重複訂單")) {
+                if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === "user") {
+                    filteredHistory.pop();
+                }
+                continue;
+            }
+        }
+        filteredHistory.push(msg);
+    }
+
     let localMessages = [
         { role: "system", content: systemPrompt },
-        ...history
+        ...filteredHistory
     ];
 
     try {
